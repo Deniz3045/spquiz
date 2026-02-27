@@ -2,13 +2,13 @@
   {
     "username": "admin",
     "password": "admin123",
-    "score": 0,
-    "role": "admin"
+    "role": "admin",
+    "score": 0
   },
   {
     "username": "player1",
-    "password": "spieler123",
-    "score": 0,
-    "role": "player"
+    "password": "player123",
+    "role": "player",
+    "score": 0
   }
 ]

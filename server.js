@@ -5,10 +5,13 @@ const path = require('path');
 const socketio = require('socket.io');
 const { Octokit } = require('@octokit/rest');
 
-const GITHUB_TOKEN = 'YOUR_GITHUB_TOKEN';
-const REPO_OWNER = 'YOUR_GITHUB_USERNAME';
-const REPO_NAME = 'YOUR_REPO_NAME';
-const BRANCH = 'main';
+require('dotenv').config(); // ganz oben
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+const REPO_OWNER  = process.env.GITHUB_USER;
+const REPO_NAME   = process.env.GITHUB_REPO;
+const BRANCH      = process.env.GITHUB_BRANCH || 'main';
+
+const octokit = new (require('@octokit/rest').Octokit)({ auth: GITHUB_TOKEN });
 
 const octokit = new Octokit({ auth: GITHUB_TOKEN });
 

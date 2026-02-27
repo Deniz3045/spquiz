@@ -2,53 +2,92 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Login</title>
+<title>Jeopardy Login</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+body{
+  font-family: 'Arial', sans-serif;
+  margin:0;
+  padding:0;
+  height:100vh;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  background: linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+  color:#fff;
+}
+.login-box{
+  background: rgba(0,0,0,0.7);
+  padding: 40px;
+  border-radius: 15px;
+  text-align:center;
+  width:300px;
+  box-shadow:0 0 20px rgba(0,0,0,0.5);
+}
+.login-box h2{
+  margin-bottom:20px;
+  color:#00c3ff;
+}
+.login-box input{
+  width:100%;
+  padding:10px;
+  margin:10px 0;
+  border:none;
+  border-radius:5px;
+  font-size:16px;
+}
+.login-box button{
+  width:100%;
+  padding:12px;
+  margin-top:15px;
+  border:none;
+  border-radius:5px;
+  background: linear-gradient(45deg,#00c3ff,#0099cc);
+  color:white;
+  font-weight:bold;
+  cursor:pointer;
+  transition:0.3s;
+}
+.login-box button:hover{
+  transform:scale(1.05);
+  background: linear-gradient(45deg,#0099cc,#00c3ff);
+}
+#status{
+  margin-top:10px;
+  height:20px;
+}
+</style>
 </head>
-
 <body>
 
-<h2>Login</h2>
-
-<input id="username" placeholder="Username"><br>
-<input id="password" placeholder="Password" type="password"><br>
-
+<div class="login-box">
+<h2>Jeopardy Login</h2>
+<input id="username" placeholder="Username">
+<input id="password" type="password" placeholder="Password">
 <button onclick="login()">Login</button>
-
 <p id="status"></p>
-
+</div>
 
 <script src="/socket.io/socket.io.js"></script>
-
 <script>
-
-// socket GLOBAL und sofort erstellen
-var socket = io();
+let socket = io();
 
 function login(){
-
-    var username = document.getElementById("username").value;
-    var password = document.getElementById("password").value;
-
-    socket.emit("login",{
-        username: username,
-        password: password
-    });
-
+  const username=document.getElementById("username").value;
+  const password=document.getElementById("password").value;
+  if(!username || !password){document.getElementById("status").innerText="Bitte ausfüllen"; return;}
+  socket.emit("login",{username,password});
 }
 
-socket.on("loginSuccess", function(user){
-
-    document.getElementById("status").innerText =
-    "Login erfolgreich: " + user.username;
-
+socket.on("loginSuccess",(user)=>{
+  localStorage.setItem("username", user.username);
+  localStorage.setItem("role", user.role);
+  window.location.href = user.role==="admin"? "/admin.html" : "/board.html";
 });
 
-socket.on("loginFail", function(msg){
-
-    document.getElementById("status").innerText = msg;
-
+socket.on("loginFail",(msg)=>{
+  document.getElementById("status").innerText = msg;
 });
-
 </script>
 
 </body>

@@ -1,0 +1,94 @@
+/* public/admin.css */
+
+/* Grundlayout */
+body {
+    font-family: 'Arial', sans-serif;
+    background: linear-gradient(135deg,#1f1f1f,#2f2f2f);
+    color: #fff;
+    margin: 0;
+    padding: 0;
+    text-align: center;
+}
+
+/* Überschriften */
+h1, h2, h3 {
+    color: #00ff99;
+    text-shadow: 1px 1px 3px #000;
+}
+
+/* Container */
+section {
+    background: rgba(0,0,0,0.7);
+    margin: 20px auto;
+    padding: 15px;
+    border-radius: 10px;
+    max-width: 700px;
+    box-shadow: 0 0 15px #00ff99;
+}
+
+/* Eingabefelder */
+input, select, textarea {
+    margin: 5px;
+    padding: 10px;
+    width: 200px;
+    border-radius: 5px;
+    border: none;
+    font-size: 16px;
+}
+
+/* Textarea größer */
+textarea {
+    width: 90%;
+    height: 100px;
+    font-family: monospace;
+    font-size: 14px;
+}
+
+/* Buttons */
+button {
+    padding: 10px 20px;
+    margin: 5px;
+    font-size: 16px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+/* Button Farben */
+#addUserBtn { background: #00ff99; color:#000; }
+#uploadBoardBtn { background: #45a29e; color:#fff; }
+#startQuizBtn { background: #ffb142; color:#000; }
+
+/* Hover Effekte */
+button:hover {
+    transform: scale(1.05);
+    filter: brightness(1.2);
+}
+
+/* Listen */
+ul {
+    list-style: none;
+    padding: 0;
+    margin: 10px 0;
+}
+ul li {
+    margin: 5px 0;
+    padding: 5px;
+    background: rgba(0,255,153,0.1);
+    border-radius: 5px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Rollen-Auswahl in Liste */
+ul li select {
+    margin-left: 10px;
+}
+
+/* Responsive */
+@media (max-width: 800px) {
+    section { width: 90%; }
+    input, select, textarea { width: 80%; }
+}

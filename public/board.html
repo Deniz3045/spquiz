@@ -2,117 +2,49 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Jeopardy – Spiel</title>
+<title>Jeopardy Spieler</title>
 <script src="/socket.io/socket.io.js"></script>
 <style>
 body{margin:0;padding:0;font-family:Arial,sans-serif;background:#0b1e2d;color:white;}
-header{background:#1b3a57;padding:15px;text-align:center;font-size:26px;color:#00c3ff;font-weight:bold;}
-.board-grid{display:grid;grid-template-columns: repeat(5, 1fr);gap:5px;margin:20px;}
-.category-box{background:#145374;text-align:center;padding:10px;font-weight:bold;border-radius:5px;}
-.question-box{background:#1e6091;padding:15px;margin:3px 0;border-radius:5px;text-align:center;cursor:pointer;transition:0.3s;}
-.question-box:hover{transform:scale(1.05);background:#00c3ff;}
-#timer{font-size:24px;color:#00ff88;margin:10px;}
-#buzzBtn{padding:15px 30px;font-size:20px;background:#00c3ff;color:white;border:none;border-radius:10px;cursor:pointer;transition:0.3s;}
-#buzzBtn:hover{transform:scale(1.1);}
-#scoreBoard{margin:20px;}
-#scoreBoard div{background:rgba(255,255,255,0.1);padding:5px 10px;margin:3px 0;border-radius:5px;display:flex;justify-content:space-between;}
+#currentQuestionPlayer{margin:20px;padding:15px;background:#0b2a42;border-radius:5px; display:none;}
+#buzzerSection{margin-top:10px; display:none;}
+button{padding:10px;margin:5px;border-radius:5px;border:none;background:#00c3ff;color:white;cursor:pointer;}
+button:hover{background:#0099cc;}
+#timerDisplayPlayer{font-size:24px;margin-top:10px;}
 </style>
 </head>
 <body>
-
-<header>Jeopardy – Spieler</header>
-
-<div id="timer">Timer: 0</div>
-<button id="buzzBtn" onclick="buzz()" disabled>BUZZ!</button>
-
-<div class="board-grid" id="boardContainer"></div>
-
-<h2>Scoreboard</h2>
-<div id="scoreBoard"></div>
+<div id="currentQuestionPlayer">
+<h3 id="questionTextPlayer"></h3>
+<div id="buzzerSection"><button id="buzzBtn">Buzz!</button></div>
+</div>
+<div id="timerDisplayPlayer"></div>
 
 <script>
 const socket = io();
-let boardData = null;
-let username = localStorage.getItem('username');
-let role = localStorage.getItem('role');
-let activeQuestion = null;
-let buzzed = false;
+let canBuzz = false;
 
-if(!username){ alert("Bitte einloggen"); window.location.href="/"; }
-
-// --- Board laden ---
-socket.emit('getBoard');
-socket.on('boardData', board=>{
-  boardData = board;
-  renderBoard();
-});
-
-// --- Board anzeigen ---
-function renderBoard(){
-  const container = document.getElementById('boardContainer');
-  container.innerHTML='';
-  if(!boardData || !boardData.categories) return;
-
-  boardData.categories.forEach(cat=>{
-    const catDiv = document.createElement('div');
-    catDiv.className='category-box';
-    catDiv.innerText = cat.name;
-    container.appendChild(catDiv);
-    cat.questions.forEach(q=>{
-      const qDiv = document.createElement('div');
-      qDiv.className='question-box';
-      qDiv.innerText = q.value + ' pts';
-      container.appendChild(qDiv);
-    });
-  });
-}
-
-// --- Buzz ---
-function buzz(){
-  if(!activeQuestion || buzzed) return;
-  socket.emit('buzz',username);
-  document.getElementById('buzzBtn').disabled=true;
-}
-
-// --- Frage ausgewählt ---
 socket.on('questionSelected', q=>{
-  activeQuestion = q;
-  buzzed = false;
-  document.getElementById('timer').innerText=`Timer: ${q.timer || 30}`;
-  document.getElementById('buzzBtn').disabled=false;
-  alert(`Neue Frage:\n${q.text}`);
+  document.getElementById("currentQuestionPlayer").style.display="block";
+  document.getElementById("questionTextPlayer").innerText = q.text;
+  document.getElementById("buzzerSection").style.display="none";
+  canBuzz=false;
 });
 
-// --- Timer Update ---
-socket.on('timerUpdate', t=>{
-  document.getElementById('timer').innerText=`Timer: ${t}`;
+socket.on('buzzersUnlocked', ()=>{
+  document.getElementById("buzzerSection").style.display="block";
+  canBuzz=true;
 });
 
-// Timer Ende
-socket.on('timerEnded', ()=>{
-  document.getElementById('buzzBtn').disabled=true;
-  activeQuestion = null;
-});
+document.getElementById("buzzBtn").onclick = ()=>{
+  if(canBuzz){
+    socket.emit('buzz', localStorage.getItem('username'));
+    canBuzz=false;
+  }
+};
 
-// Buzz Update
-socket.on('buzzUpdate', player=>{
-  if(player!==username) document.getElementById('buzzBtn').disabled=true;
-  alert(`${player} buzzed!`);
-});
-
-// Score Update
-socket.on('scoreUpdate', users=>{
-  const container = document.getElementById('scoreBoard');
-  container.innerHTML='';
-  users.forEach(u=>{
-    const div = document.createElement('div');
-    div.innerText = `${u.username} (${u.role})`;
-    const span = document.createElement('span');
-    span.innerText = u.score;
-    div.appendChild(span);
-    container.appendChild(div);
-  });
-});
+socket.on('timerUpdate', time=>{document.getElementById("timerDisplayPlayer").innerText = "Timer: "+time;});
+socket.on('timerEnded', ()=>{document.getElementById("timerDisplayPlayer").innerText = "Zeit abgelaufen!";});
 </script>
 </body>
 </html>

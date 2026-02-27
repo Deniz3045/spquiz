@@ -23,14 +23,20 @@
 <h2>Spielerübersicht</h2>
 <ul id="userList"></ul>
 
-<h2>Boards</h2>
+<h2>Boards verwalten</h2>
 <button id="refreshBoardsBtn">Boards laden</button>
 <ul id="boardList"></ul>
 
+<h3>Neues Board erstellen</h3>
+<input id="newBoardName" placeholder="Board Name">
+<button id="createBoardBtn">Board erstellen</button>
+
 <script>
 const socket = io();
-socket.emit('getUsers');
+let currentUser = null;
 
+// --- Spieler laden ---
+socket.emit('getUsers');
 socket.on('usersData', users=>{
   const ul = document.getElementById('userList');
   ul.innerHTML='';
@@ -41,6 +47,7 @@ socket.on('usersData', users=>{
   });
 });
 
+// --- Neuer Spieler ---
 document.getElementById('addUserBtn').onclick = async () => {
   const username = document.getElementById('newUsername').value;
   const password = document.getElementById('newPassword').value;
@@ -54,6 +61,43 @@ document.getElementById('addUserBtn').onclick = async () => {
   alert(await res.text());
   socket.emit('getUsers');
 };
+
+// --- Boards laden ---
+async function loadBoards(){
+  const res = await fetch('/admin/boards');
+  const data = await res.json();
+  const ul = document.getElementById('boardList');
+  ul.innerHTML='';
+  data.forEach(b=>{
+    const li=document.createElement('li');
+    li.textContent = `${b.name} (erstellt von: ${b.author})`;
+    const editBtn = document.createElement('button');
+    editBtn.textContent="Bearbeiten";
+    editBtn.onclick = ()=>editBoard(b.name);
+    li.appendChild(editBtn);
+    ul.appendChild(li);
+  });
+}
+document.getElementById('refreshBoardsBtn').onclick = loadBoards;
+loadBoards();
+
+// --- Neues Board erstellen ---
+document.getElementById('createBoardBtn').onclick = async ()=>{
+  const name = document.getElementById('newBoardName').value;
+  if(!name){ alert("Bitte Boardnamen eingeben"); return; }
+  const res = await fetch('/admin/createBoard',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({name,author:"Admin"})
+  });
+  alert(await res.text());
+  loadBoards();
+};
+
+// --- Board bearbeiten (öffnet Admin Quiz Fenster) ---
+function editBoard(name){
+  window.open(`/quiz.html?board=${encodeURIComponent(name)}`, '_blank','width=1200,height=800');
+}
 </script>
 </body>
 </html>

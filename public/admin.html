@@ -7,14 +7,19 @@
 <style>
 body{margin:0;padding:0;font-family:Arial,sans-serif;background:#0b1e2d;color:white;}
 header{background:#1b3a57;padding:15px;text-align:center;font-size:26px;color:#00c3ff;font-weight:bold;}
-button{padding:10px;margin:5px;border-radius:5px;border:none;background:#00c3ff;color:white;cursor:pointer;}
+section{margin:15px;padding:10px;background:#145374;border-radius:5px;}
+h3{margin-top:0;}
+input, select, button{padding:8px;margin:5px;border-radius:5px;border:none;font-size:14px;}
+button{background:#00c3ff;color:white;cursor:pointer;transition:0.3s;}
 button:hover{background:#0099cc;}
-#userList, #boardList{margin:10px;padding:10px;background:#145374;border-radius:5px;}
+.user-item, .board-item{padding:5px;margin:3px;background:#1e6091;border-radius:5px;display:flex;justify-content:space-between;align-items:center;}
+.user-item span, .board-item span{flex:1;}
 </style>
 </head>
 <body>
 <header>Admin Panel</header>
 
+<!-- Spielerverwaltung -->
 <section>
 <h3>Spieler / Admins verwalten</h3>
 <input id="newUser" placeholder="Username">
@@ -24,8 +29,12 @@ button:hover{background:#0099cc;}
 <div id="userList"></div>
 </section>
 
+<!-- Boardverwaltung -->
 <section>
 <h3>Boards verwalten</h3>
+<input id="newBoardName" placeholder="Board Name">
+<input type="file" id="boardFile">
+<button onclick="uploadBoard()">Hochladen</button>
 <div id="boardList"></div>
 <button onclick="openQuizWindow()">Quiz starten</button>
 </section>
@@ -34,38 +43,82 @@ button:hover{background:#0099cc;}
 const socket = io();
 let boardData = null;
 
+// Spieler hinzufügen
 function addUser(){
   const username=document.getElementById("newUser").value;
   const password=document.getElementById("newPass").value;
   const role=document.getElementById("newRole").value;
+  if(!username||!password) return alert("Bitte Username & Passwort eingeben");
   socket.emit('addUser',{username,password,role});
 }
 
+// Board hochladen
+function uploadBoard(){
+  const file = document.getElementById("boardFile").files[0];
+  const name = document.getElementById("newBoardName").value || file.name;
+  if(!file) return alert("Bitte Board-Datei auswählen");
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const data = JSON.parse(e.target.result);
+      data.name = name;
+      data.uploadedBy = localStorage.getItem('username');
+      socket.emit('uploadBoard', data);
+    }catch(err){alert("Ungültige JSON-Datei");}
+  };
+  reader.readAsText(file);
+}
+
+// Listen
 socket.on('userListUpdate', users=>{
   const ul = document.getElementById("userList");
   ul.innerHTML="";
   users.forEach(u=>{
-    ul.innerHTML += `<div>${u.username} - ${u.role} - Score: ${u.score}</div>`;
+    const div = document.createElement("div");
+    div.className="user-item";
+    div.innerHTML=`<span>${u.username} (${u.role}) - Score: ${u.score}</span>
+    <select onchange="changeRole('${u.username}',this.value)">
+      <option value="player" ${u.role==='player'?'selected':''}>Spieler</option>
+      <option value="editor" ${u.role==='editor'?'selected':''}>Editor</option>
+      <option value="admin" ${u.role==='admin'?'selected':''}>Admin</option>
+    </select>`;
+    ul.appendChild(div);
   });
 });
 
-socket.on('boardData', data=>{
-  boardData = data;
+function changeRole(username,role){
+  socket.emit('changeRole',{username,role});
+}
+
+// Board Liste
+socket.on('boardListUpdate', boards=>{
   const bl = document.getElementById("boardList");
   bl.innerHTML="";
-  data.categories.forEach((cat,idx)=>{
-    bl.innerHTML += `<div>${cat.name}</div>`;
+  boards.forEach((b,i)=>{
+    const div = document.createElement("div");
+    div.className="board-item";
+    div.innerHTML=`<span>${b.name} (hochgeladen von ${b.uploadedBy || 'unbekannt'})</span>
+    <button onclick="selectBoard(${i})">Benutzen</button>`;
+    bl.appendChild(div);
   });
 });
 
+function selectBoard(index){
+  socket.emit('selectBoard', index);
+}
+
+// Quiz starten
 function openQuizWindow(){
-  if(!boardData){alert("Kein Board geladen"); return;}
   const quizWindow = window.open("/quiz.html","QuizLeitung","width=1200,height=800");
   quizWindow.boardData = boardData;
 }
 
-socket.emit('getBoard');
+// Initiale Daten abfragen
 socket.emit('getUsers');
+socket.emit('getBoards');
+
+// Board & User Update
+socket.on('boardSelected', data=>{ boardData = data; alert(`Board ${data.name} aktiviert!`); });
 </script>
 </body>
 </html>

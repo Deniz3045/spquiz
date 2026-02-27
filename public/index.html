@@ -3,90 +3,54 @@
 <head>
 <meta charset="UTF-8">
 <title>Jeopardy Login</title>
-<link rel="stylesheet" href="css/style.css">
+<script src="/socket.io/socket.io.js"></script>
 <style>
-body{
-  font-family: 'Arial', sans-serif;
-  margin:0;
-  padding:0;
-  height:100vh;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  background: linear-gradient(135deg,#0f2027,#203a43,#2c5364);
-  color:#fff;
-}
-.login-box{
-  background: rgba(0,0,0,0.7);
-  padding: 40px;
-  border-radius: 15px;
-  text-align:center;
-  width:300px;
-  box-shadow:0 0 20px rgba(0,0,0,0.5);
-}
-.login-box h2{
-  margin-bottom:20px;
-  color:#00c3ff;
-}
-.login-box input{
-  width:100%;
-  padding:10px;
-  margin:10px 0;
-  border:none;
-  border-radius:5px;
-  font-size:16px;
-}
-.login-box button{
-  width:100%;
-  padding:12px;
-  margin-top:15px;
-  border:none;
-  border-radius:5px;
-  background: linear-gradient(45deg,#00c3ff,#0099cc);
-  color:white;
-  font-weight:bold;
-  cursor:pointer;
-  transition:0.3s;
-}
-.login-box button:hover{
-  transform:scale(1.05);
-  background: linear-gradient(45deg,#0099cc,#00c3ff);
-}
-#status{
-  margin-top:10px;
-  height:20px;
-}
+body{margin:0;padding:0;font-family:Arial,sans-serif;background:#0b1e2d;color:white;display:flex;justify-content:center;align-items:center;height:100vh;}
+.login-container{background:rgba(0,0,0,0.7);padding:40px;border-radius:10px;text-align:center;width:300px;}
+input{width:90%;padding:10px;margin:10px 0;border-radius:5px;border:none;font-size:16px;}
+button{width:95%;padding:10px;margin:10px 0;border-radius:5px;border:none;background:#00c3ff;color:white;font-size:18px;cursor:pointer;transition:0.3s;}
+button:hover{transform:scale(1.05);background:#0099cc;}
+#errorMsg{color:#ff5555;margin-top:10px;font-weight:bold;}
 </style>
 </head>
 <body>
 
-<div class="login-box">
+<div class="login-container">
 <h2>Jeopardy Login</h2>
 <input id="username" placeholder="Username">
 <input id="password" type="password" placeholder="Password">
 <button onclick="login()">Login</button>
-<p id="status"></p>
+<div id="errorMsg"></div>
 </div>
 
-<script src="/socket.io/socket.io.js"></script>
 <script>
-let socket = io();
+const socket = io();
 
 function login(){
-  const username=document.getElementById("username").value;
-  const password=document.getElementById("password").value;
-  if(!username || !password){document.getElementById("status").innerText="Bitte ausfüllen"; return;}
-  socket.emit("login",{username,password});
+  const username = document.getElementById("username").value;
+  const password = document.getElementById("password").value;
+  if(!username || !password){
+    document.getElementById("errorMsg").innerText="Bitte Username und Passwort eingeben";
+    return;
+  }
+
+  socket.emit('login',{username,password});
 }
 
-socket.on("loginSuccess",(user)=>{
-  localStorage.setItem("username", user.username);
-  localStorage.setItem("role", user.role);
-  window.location.href = user.role==="admin"? "/admin.html" : "/board.html";
+// Login Success
+socket.on('loginSuccess', data=>{
+  localStorage.setItem("username",data.username);
+  localStorage.setItem("role",data.role);
+  if(data.role==="admin"){
+    window.location.href="/admin.html";
+  } else {
+    window.location.href="/board.html";
+  }
 });
 
-socket.on("loginFail",(msg)=>{
-  document.getElementById("status").innerText = msg;
+// Login Fail
+socket.on('loginFail', msg=>{
+  document.getElementById("errorMsg").innerText = msg;
 });
 </script>
 

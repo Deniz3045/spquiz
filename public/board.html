@@ -1,4 +1,3 @@
-<!-- public/board.html -->
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -9,14 +8,8 @@
 </head>
 <body>
 <h1>Jeopardy Quiz</h1>
-
-<!-- Scoreboard -->
 <div id="scoreboard"></div>
-
-<!-- Board -->
 <div id="board"></div>
-
-<!-- Fragefenster -->
 <div id="questionWindow" class="hidden">
   <h2 id="questionCategory"></h2>
   <p id="questionText"></p>
@@ -27,23 +20,24 @@
 
 <script>
 const socket = io();
+let username, role;
 
-let username = prompt("Gib deinen Benutzernamen ein:");
-let password = prompt("Passwort:");
-let role = 'player';
+socket.on('connect', ()=>{
+  username = prompt("Benutzername:");
+  let password = prompt("Passwort:");
+  socket.emit('login',{username,password});
+});
 
-// Login
-socket.emit('login',{username,password});
-socket.on('loginSuccess', data => {
-  username = data.username; role=data.role;
-  alert(`Willkommen ${username}! Rolle: ${role}`);
+socket.on('loginSuccess', data=>{
+  username=data.username; role=data.role;
+  alert(`Willkommen ${username} (${role})`);
   socket.emit('getBoard');
   socket.emit('getUsers');
 });
-socket.on('loginFail', msg => alert(msg));
 
-// Scoreboard
-const scoreboard = document.getElementById('scoreboard');
+socket.on('loginFail', msg=>alert(msg));
+
+const scoreboard=document.getElementById('scoreboard');
 socket.on('scoreUpdate', users=>{
   scoreboard.innerHTML="<h3>Punkte</h3>";
   users.forEach(u=>{
@@ -53,8 +47,7 @@ socket.on('scoreUpdate', users=>{
   });
 });
 
-// Board
-const boardDiv = document.getElementById('board');
+const boardDiv=document.getElementById('board');
 socket.on('boardData', board=>{
   boardDiv.innerHTML='';
   board.categories.forEach((cat,ci)=>{
@@ -63,42 +56,33 @@ socket.on('boardData', board=>{
     cat.questions.forEach((q,qi)=>{
       const btn=document.createElement('button');
       btn.textContent=q.value;
-      btn.disabled = true; // Spieler kann Fragen nicht direkt auswählen
+      btn.disabled=true;
       col.appendChild(btn);
     });
     boardDiv.appendChild(col);
   });
 });
 
-// Fragefenster
-const questionWindow = document.getElementById('questionWindow');
-const questionCategory = document.getElementById('questionCategory');
-const questionText = document.getElementById('questionText');
-const questionValue = document.getElementById('questionValue');
-const timerDisplay = document.getElementById('timerDisplay');
-const buzzBtn = document.getElementById('buzzBtn');
+const questionWindow=document.getElementById('questionWindow');
+const questionCategory=document.getElementById('questionCategory');
+const questionText=document.getElementById('questionText');
+const questionValue=document.getElementById('questionValue');
+const timerDisplay=document.getElementById('timerDisplay');
+const buzzBtn=document.getElementById('buzzBtn');
 
 socket.on('questionSelected', q=>{
   questionWindow.classList.remove('hidden');
-  questionCategory.textContent = q.category || '';
-  questionText.textContent = q.text;
-  questionValue.textContent = q.value;
-  buzzBtn.disabled = true;
+  questionCategory.textContent=q.category||'';
+  questionText.textContent=q.text;
+  questionValue.textContent=q.value;
+  buzzBtn.disabled=true;
 });
-
-// Buzzers freigeben
 socket.on('buzzersUnlocked', ()=>buzzBtn.disabled=false);
 buzzBtn.onclick = ()=>socket.emit('buzz', username);
 
-// Timer
-socket.on('timerUpdate', t=>{ timerDisplay.textContent=`Timer: ${t}`; });
-socket.on('timerEnded', ()=>{ timerDisplay.textContent="Zeit abgelaufen!"; });
-
-// Buzz Update
-socket.on('buzzUpdate', user=>{
-  alert(`${user} hat gebuzzt!`);
-});
-
+socket.on('timerUpdate', t=>timerDisplay.textContent=`Timer: ${t}`);
+socket.on('timerEnded', ()=>timerDisplay.textContent="Zeit abgelaufen!");
+socket.on('buzzUpdate', user=>alert(`${user} hat gebuzzt!`));
 </script>
 </body>
 </html>

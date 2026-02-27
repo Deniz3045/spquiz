@@ -3,55 +3,239 @@
 <head>
 <meta charset="UTF-8">
 <title>Jeopardy Board</title>
-<link rel="stylesheet" href="css/style.css">
+<script src="/socket.io/socket.io.js"></script>
+
 <style>
-body{font-family:Arial;background:#0d1b2a;color:#fff;margin:0}
-.board-container{max-width:1200px;margin:20px auto;padding:20px;text-align:center}
-h1{margin-bottom:20px}
-#board{display:flex;justify-content:center;flex-wrap:wrap}
-.category{margin:10px;background:#1b263b;padding:10px;border-radius:10px;min-width:140px}
-.category h3{margin-bottom:10px}
-.category button{display:block;width:100%;margin:5px 0;padding:10px;background:#415a77;color:white;border:none;border-radius:5px;cursor:pointer;transition:0.3s}
-.category button:hover{background:#778da9}
-#questionPanel{margin-top:20px;padding:15px;background:#778da9;border-radius:10px;color:#0d1b2a;display:none;position:relative}
-#timerDisplay{font-weight:bold;font-size:1.5em;margin:10px 0}
-#buzzBtn{background:#e63946;color:white}
-#answerInput{padding:8px;width:50%;margin:5px 0}
-.correct{background:#38b000 !important;color:white}
-.wrong{background:#e63946 !important;color:white}
-.activePlayer{border:2px solid #ffbe0b}
-#scores{margin-top:20px;text-align:left;max-width:400px;margin-left:auto;margin-right:auto}
+body{
+  font-family:'Arial', sans-serif;
+  margin:0;
+  padding:0;
+  background:#0b1e2d;
+  color:white;
+}
+
+header{
+  background:#1b3a57;
+  padding:15px;
+  text-align:center;
+  font-size:24px;
+  color:#00c3ff;
+  font-weight:bold;
+}
+
+#scoreboard{
+  display:flex;
+  justify-content:center;
+  margin:10px 0;
+  font-size:18px;
+}
+
+#scoreboard div{
+  margin:0 20px;
+  padding:5px 10px;
+  background:rgba(255,255,255,0.1);
+  border-radius:5px;
+}
+
+#board{
+  display:grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap:5px;
+  max-width:1000px;
+  margin:20px auto;
+}
+
+.category{
+  background:#145374;
+  text-align:center;
+  padding:10px;
+  font-weight:bold;
+  font-size:18px;
+  border-radius:5px;
+}
+
+.question-btn{
+  background:#1e6091;
+  color:white;
+  font-size:20px;
+  padding:20px;
+  border:none;
+  border-radius:5px;
+  cursor:pointer;
+  transition:0.3s;
+}
+
+.question-btn:hover{
+  transform: scale(1.05);
+  background:#00c3ff;
+}
+
+#questionModal{
+  position:fixed;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+  background:rgba(0,0,0,0.85);
+  display:none;
+  justify-content:center;
+  align-items:center;
+  flex-direction:column;
+  text-align:center;
+}
+
+#questionModal p{
+  font-size:24px;
+  margin-bottom:20px;
+}
+
+#questionModal button{
+  padding:15px 30px;
+  margin:5px;
+  font-size:18px;
+  border:none;
+  border-radius:5px;
+  cursor:pointer;
+  background:#00c3ff;
+  color:white;
+  transition:0.3s;
+}
+
+#questionModal button:hover{
+  transform: scale(1.05);
+  background:#0099cc;
+}
+
+#timer{
+  font-size:22px;
+  margin-bottom:10px;
+  color:#ffcc00;
+}
+
+#buzzBtn{
+  background:#e63946;
+}
+
+#buzzBtn:hover{
+  background:#ff4d6d;
+}
 </style>
 </head>
 <body>
-<div class="board-container">
-<h1>Jeopardy Multiplayer</h1>
+
+<header>Jeopardy Board</header>
+
+<div id="scoreboard">
+  <div id="score1">Spieler1: 0</div>
+  <div id="score2">Spieler2: 0</div>
+  <div id="score3">Spieler3: 0</div>
+</div>
+
 <div id="board"></div>
-<div id="questionPanel">
-<h2 id="categoryTitle"></h2>
-<p id="questionText"></p>
-<input type="text" id="answerInput" placeholder="Antwort">
-<button id="submitAnswerBtn">Antworten</button>
-<button id="buzzBtn">Buzz</button>
-<p id="timerDisplay"></p>
+
+<!-- Question Modal -->
+<div id="questionModal">
+  <div id="timer"></div>
+  <p id="questionText"></p>
+  <div>
+    <button onclick="answer(true)">Richtig</button>
+    <button onclick="answer(false)">Falsch</button>
+    <button id="buzzBtn" onclick="buzz()">Buzz!</button>
+  </div>
 </div>
-<div id="scores">
-<h3>Punkte</h3>
-<ul id="scoreList"></ul>
-</div>
-<audio id="buzzSound" src="assets/buzz.mp3"></audio>
-<audio id="timerEndSound" src="assets/timerEnd.mp3"></audio>
-<script src="/socket.io/socket.io.js"></script>
+
 <script>
-const socket=io();
-const username=localStorage.getItem('username'); let currentQuestion=null; let timerInterval=null;
-socket.emit('getBoard'); socket.on('boardData',board=>renderBoard(board));
-function renderBoard(board){const boardDiv=document.getElementById('board');boardDiv.innerHTML='';board.categories.forEach((cat,i)=>{const col=document.createElement('div');col.className='category';const title=document.createElement('h3');title.textContent=cat.name;col.appendChild(title);cat.questions.forEach((q,j)=>{const btn=document.createElement('button');btn.textContent=q.value;btn.addEventListener('click',()=>{socket.emit('selectQuestion',{categoryIndex:i,questionIndex:j,admin:false})});col.appendChild(btn)});boardDiv.appendChild(col)})}
-socket.on('questionSelected',question=>{currentQuestion=question;document.getElementById('questionPanel').style.display='block';document.getElementById('categoryTitle').textContent=question.category||'';document.getElementById('questionText').textContent=question.question;document.getElementById('timerDisplay').textContent=question.timer;if(timerInterval)clearInterval(timerInterval);let time=question.timer||30;timerInterval=setInterval(()=>{if(time<=0){clearInterval(timerInterval);document.getElementById('timerEndSound').play();document.getElementById('timerDisplay').textContent='Zeit abgelaufen!'}else{document.getElementById('timerDisplay').textContent=time;time--}},1000)});
-document.getElementById('buzzBtn').addEventListener('click',()=>{socket.emit('buzz',username)});
-document.getElementById('submitAnswerBtn').addEventListener('click',()=>{const answer=document.getElementById('answerInput').value;if(!answer)return;const correct=answer.trim().toLowerCase()===currentQuestion.answer.toLowerCase();socket.emit('answer',{username,correct});const panel=document.getElementById('questionPanel');panel.classList.add(correct?'correct':'wrong');setTimeout(()=>panel.classList.remove('correct','wrong'),1000)});
-socket.on('scoreUpdate',users=>{const scoreList=document.getElementById('scoreList');scoreList.innerHTML='';users.forEach(u=>{const li=document.createElement('li');li.textContent=`${u.username}: ${u.score} Punkte`;if(u.username===username)li.classList.add('activePlayer');scoreList.appendChild(li)})});
-socket.on('buzzUpdate',activePlayer=>{document.getElementById('buzzSound').play();alert(`Aktiver Spieler: ${activePlayer}`)});
+const socket = io();
+let username = localStorage.getItem("username");
+let role = localStorage.getItem("role");
+let currentQuestion = null;
+
+// Scoreboard Daten
+let users = [
+  {username:"Spieler1",score:0},
+  {username:"Spieler2",score:0},
+  {username:"Spieler3",score:0}
+];
+
+function renderScores(){
+  users.forEach((u,i)=>{
+    const el = document.getElementById("score"+(i+1));
+    if(el) el.innerText = u.username+": "+u.score;
+  });
+}
+
+// --- Board aufbauen ---
+socket.emit("getBoard");
+
+socket.on("boardData",(board)=>{
+  const boardDiv = document.getElementById("board");
+  boardDiv.innerHTML = "";
+
+  // Kategorien
+  board.categories.forEach((cat,index)=>{
+    const catDiv = document.createElement("div");
+    catDiv.className="category";
+    catDiv.innerText=cat.name;
+    boardDiv.appendChild(catDiv);
+  });
+
+  // Fragen
+  for(let q=0;q<5;q++){
+    board.categories.forEach((cat,index)=>{
+      const question = cat.questions[q];
+      const btn = document.createElement("button");
+      btn.className="question-btn";
+      btn.innerText = question.value;
+      btn.onclick = ()=>{
+        if(role==="admin") socket.emit("selectQuestion",{categoryIndex:index,questionIndex:q,admin:true});
+      };
+      boardDiv.appendChild(btn);
+    });
+  }
+});
+
+// --- Frage Modal ---
+socket.on("questionSelected",(q)=>{
+  currentQuestion = q;
+  document.getElementById("questionText").innerText = q.text;
+  document.getElementById("questionModal").style.display="flex";
+  document.getElementById("timer").innerText = "Timer: "+q.timer;
+  socket.emit("startTimer");
+});
+
+// Timer update
+socket.on("timerUpdate",(t)=>{
+  document.getElementById("timer").innerText="Timer: "+t;
+});
+
+socket.on("timerEnded",()=>{
+  document.getElementById("questionModal").style.display="none";
+});
+
+// Buzz Funktion
+function buzz(){
+  socket.emit("buzz", username);
+  document.getElementById("buzzBtn").disabled=true;
+}
+
+// Antwort Funktion
+function answer(correct){
+  socket.emit("answer",{username,correct});
+  document.getElementById("questionModal").style.display="none";
+}
+
+// Score Update
+socket.on("scoreUpdate",(data)=>{
+  users = data;
+  renderScores();
+});
+
+// Buzz Update
+socket.on("buzzUpdate",(player)=>{
+  document.getElementById("timer").innerText="Aktiver Spieler: "+player;
+});
+
+renderScores();
 </script>
 </body>
 </html>

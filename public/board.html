@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Jeopardy Board</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+body{font-family:Arial;background:#0d1b2a;color:#fff;margin:0}
+.board-container{max-width:1200px;margin:20px auto;padding:20px;text-align:center}
+h1{margin-bottom:20px}
+#board{display:flex;justify-content:center;flex-wrap:wrap}
+.category{margin:10px;background:#1b263b;padding:10px;border-radius:10px;min-width:140px}
+.category h3{margin-bottom:10px}
+.category button{display:block;width:100%;margin:5px 0;padding:10px;background:#415a77;color:white;border:none;border-radius:5px;cursor:pointer;transition:0.3s}
+.category button:hover{background:#778da9}
+#questionPanel{margin-top:20px;padding:15px;background:#778da9;border-radius:10px;color:#0d1b2a;display:none;position:relative}
+#timerDisplay{font-weight:bold;font-size:1.5em;margin:10px 0}
+#buzzBtn{background:#e63946;color:white}
+#answerInput{padding:8px;width:50%;margin:5px 0}
+.correct{background:#38b000 !important;color:white}
+.wrong{background:#e63946 !important;color:white}
+.activePlayer{border:2px solid #ffbe0b}
+#scores{margin-top:20px;text-align:left;max-width:400px;margin-left:auto;margin-right:auto}
+</style>
+</head>
+<body>
+<div class="board-container">
+<h1>Jeopardy Multiplayer</h1>
+<div id="board"></div>
+<div id="questionPanel">
+<h2 id="categoryTitle"></h2>
+<p id="questionText"></p>
+<input type="text" id="answerInput" placeholder="Antwort">
+<button id="submitAnswerBtn">Antworten</button>
+<button id="buzzBtn">Buzz</button>
+<p id="timerDisplay"></p>
+</div>
+<div id="scores">
+<h3>Punkte</h3>
+<ul id="scoreList"></ul>
+</div>
+<audio id="buzzSound" src="assets/buzz.mp3"></audio>
+<audio id="timerEndSound" src="assets/timerEnd.mp3"></audio>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket=io();
+const username=localStorage.getItem('username'); let currentQuestion=null; let timerInterval=null;
+socket.emit('getBoard'); socket.on('boardData',board=>renderBoard(board));
+function renderBoard(board){const boardDiv=document.getElementById('board');boardDiv.innerHTML='';board.categories.forEach((cat,i)=>{const col=document.createElement('div');col.className='category';const title=document.createElement('h3');title.textContent=cat.name;col.appendChild(title);cat.questions.forEach((q,j)=>{const btn=document.createElement('button');btn.textContent=q.value;btn.addEventListener('click',()=>{socket.emit('selectQuestion',{categoryIndex:i,questionIndex:j,admin:false})});col.appendChild(btn)});boardDiv.appendChild(col)})}
+socket.on('questionSelected',question=>{currentQuestion=question;document.getElementById('questionPanel').style.display='block';document.getElementById('categoryTitle').textContent=question.category||'';document.getElementById('questionText').textContent=question.question;document.getElementById('timerDisplay').textContent=question.timer;if(timerInterval)clearInterval(timerInterval);let time=question.timer||30;timerInterval=setInterval(()=>{if(time<=0){clearInterval(timerInterval);document.getElementById('timerEndSound').play();document.getElementById('timerDisplay').textContent='Zeit abgelaufen!'}else{document.getElementById('timerDisplay').textContent=time;time--}},1000)});
+document.getElementById('buzzBtn').addEventListener('click',()=>{socket.emit('buzz',username)});
+document.getElementById('submitAnswerBtn').addEventListener('click',()=>{const answer=document.getElementById('answerInput').value;if(!answer)return;const correct=answer.trim().toLowerCase()===currentQuestion.answer.toLowerCase();socket.emit('answer',{username,correct});const panel=document.getElementById('questionPanel');panel.classList.add(correct?'correct':'wrong');setTimeout(()=>panel.classList.remove('correct','wrong'),1000)});
+socket.on('scoreUpdate',users=>{const scoreList=document.getElementById('scoreList');scoreList.innerHTML='';users.forEach(u=>{const li=document.createElement('li');li.textContent=`${u.username}: ${u.score} Punkte`;if(u.username===username)li.classList.add('activePlayer');scoreList.appendChild(li)})});
+socket.on('buzzUpdate',activePlayer=>{document.getElementById('buzzSound').play();alert(`Aktiver Spieler: ${activePlayer}`)});
+</script>
+</body>
+</html>

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Admin Panel</title>
+<script src="/socket.io/socket.io.js"></script>
+
+<style>
+body{
+    font-family:Arial;
+    background:#111;
+    color:white;
+    padding:20px;
+}
+
+input,button{
+    padding:10px;
+    margin:5px;
+}
+
+button{
+    background:#00c3ff;
+    border:none;
+    color:white;
+    cursor:pointer;
+}
+</style>
+</head>
+<body>
+
+<h1>Admin Panel</h1>
+
+<div id="loginCheck"></div>
+
+<hr>
+
+<h2>Spieler erstellen</h2>
+
+<input id="newUser" placeholder="Username">
+<input id="newPass" placeholder="Password">
+
+<button onclick="createUser()">Erstellen</button>
+
+<p id="status"></p>
+
+<hr>
+
+<button onclick="logout()">Logout</button>
+
+<script>
+
+const socket = io();
+
+const username = localStorage.getItem("username");
+const role = localStorage.getItem("role");
+
+if(!username || role !== "admin"){
+    alert("Kein Admin Zugriff");
+    window.location.href="/";
+}
+
+document.getElementById("loginCheck").innerText =
+"Logged in als Admin: " + username;
+
+
+function createUser(){
+
+    const u = document.getElementById("newUser").value;
+    const p = document.getElementById("newPass").value;
+
+    fetch("/admin/addUser",{
+        method:"POST",
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+            username:u,
+            password:p
+        })
+    })
+    .then(res=>res.text())
+    .then(msg=>{
+        document.getElementById("status").innerText = msg;
+    });
+
+}
+
+function logout(){
+
+    localStorage.clear();
+    window.location.href="/";
+
+}
+
+</script>
+
+</body>
+</html>

@@ -1,4 +1,4 @@
-require('dotenv').config(); // dotenv für Umgebungsvariablen
+require('dotenv').config(); // dotenv für sichere Tokens
 const express = require('express');
 const http = require('http');
 const path = require('path');
@@ -12,25 +12,20 @@ const io = socketio(server);
 app.use(express.static(path.join(__dirname,'public')));
 app.use(express.json());
 
-// --- GitHub API Config ---
+// --- GitHub Config ---
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const REPO_OWNER  = process.env.GITHUB_USER;
 const REPO_NAME   = process.env.GITHUB_REPO;
 const BRANCH      = process.env.GITHUB_BRANCH || 'main';
-
 const octokit = new Octokit({ auth: GITHUB_TOKEN });
 
-// --- Helper Functions GitHub ---
+// --- Helper Functions ---
 async function readJSON(path){
   try{
     const { data } = await octokit.repos.getContent({
-      owner: REPO_OWNER,
-      repo: REPO_NAME,
-      path,
-      ref: BRANCH
+      owner: REPO_OWNER, repo: REPO_NAME, path, ref: BRANCH
     });
-    const content = Buffer.from(data.content,'base64').toString();
-    return JSON.parse(content);
+    return JSON.parse(Buffer.from(data.content,'base64').toString());
   }catch(e){
     console.log('GitHub read error',path,e.message);
     return [];
@@ -40,10 +35,7 @@ async function readJSON(path){
 async function writeJSON(path,json){
   try{
     const existing = await octokit.repos.getContent({
-      owner: REPO_OWNER,
-      repo: REPO_NAME,
-      path,
-      ref: BRANCH
+      owner: REPO_OWNER, repo: REPO_NAME, path, ref: BRANCH
     }).catch(()=>({data:{sha:null}}));
 
     await octokit.repos.createOrUpdateFileContents({
@@ -69,51 +61,62 @@ let boards = { categories: [], multiplier: 1 };
 
 // --- Admin APIs ---
 app.post('/admin/addUser', async(req,res)=>{
-  const {username,password,role,creator} = req.body;
-  const creatorUser = users.find(u=>u.username===creator);
-  if(!creatorUser || creatorUser.role!=='admin') return res.status(403).send('Nur Admins dürfen neue User anlegen');
-  if(users.find(u=>u.username===username)) return res.status(400).send('User existiert');
-  users.push({username,password,role:role||'player',score:0});
-  await writeJSON('data/users.json',users);
-  res.send('Spieler hinzugefügt');
+  try{
+    const {username,password,role,creator} = req.body;
+    const creatorUser = users.find(u=>u.username===creator);
+    if(!creatorUser || creatorUser.role!=='admin') return res.status(403).send('Nur Admins dürfen neue User anlegen');
+    if(users.find(u=>u.username===username)) return res.status(400).send('User existiert');
+    users.push({username,password,role:role||'player',score:0});
+    await writeJSON('data/users.json',users);
+    res.send('Spieler hinzugefügt');
+  }catch(e){
+    console.log('addUser error',e.message);
+    res.status(500).send('Fehler beim Hinzufügen');
+  }
 });
 
 app.post('/admin/saveBoard', async(req,res)=>{
-  const {username, board} = req.body;
-  const user = users.find(u=>u.username===username);
-  if(!user || (user.role!=='admin' && user.role!=='editor')) return res.status(403).send('Keine Berechtigung');
-  boards = board;
-  await writeJSON('data/boards.json',boards);
-  res.send('Board gespeichert');
+  try{
+    const {username, board} = req.body;
+    const user = users.find(u=>u.username===username);
+    if(!user || (user.role!=='admin' && user.role!=='editor')) return res.status(403).send('Keine Berechtigung');
+    boards = board;
+    await writeJSON('data/boards.json',boards);
+    res.send('Board gespeichert');
+  }catch(e){
+    console.log('saveBoard error',e.message);
+    res.status(500).send('Fehler beim Speichern');
+  }
 });
 
 app.post('/admin/uploadBoard', async(req,res)=>{
-  const {username, board} = req.body;
-  const user = users.find(u=>u.username===username);
-  if(!user || (user.role!=='admin' && user.role!=='editor')) return res.status(403).send('Keine Berechtigung');
-  if(!board.name) return res.status(400).send('Board muss einen Namen haben');
-  board.uploadedBy = username;
-  const filename = `data/${board.name}.json`;
-  await writeJSON(filename,board);
-  res.send('Board hochgeladen');
+  try{
+    const {username, board} = req.body;
+    const user = users.find(u=>u.username===username);
+    if(!user || (user.role!=='admin' && user.role!=='editor')) return res.status(403).send('Keine Berechtigung');
+    if(!board.name) return res.status(400).send('Board muss einen Namen haben');
+    board.uploadedBy = username;
+    const filename = `data/${board.name}.json`;
+    await writeJSON(filename,board);
+    res.send('Board hochgeladen');
+  }catch(e){
+    console.log('uploadBoard error',e.message);
+    res.status(500).send('Fehler beim Upload');
+  }
 });
 
-// --- Socket.IO Multiplayer ---
+// --- Socket.IO ---
 let currentGame = { activePlayer:null, currentQuestion:null, timer:0 };
 
 io.on('connection', socket=>{
-
-  // Login
   socket.on('login', ({username,password})=>{
     const user = users.find(u=>u.username===username && u.password===password);
     if(user) socket.emit('loginSuccess',{username:user.username,score:user.score,role:user.role});
     else socket.emit('loginFail','Ungültige Daten');
   });
 
-  // Board an alle Spieler
   socket.on('getBoard', ()=>socket.emit('boardData',boards));
 
-  // Admin wählt Frage
   socket.on('selectQuestion', ({categoryIndex,questionIndex,admin})=>{
     if(admin){
       currentGame.currentQuestion = boards.categories[categoryIndex].questions[questionIndex];
@@ -123,7 +126,6 @@ io.on('connection', socket=>{
     }
   });
 
-  // Timer starten
   socket.on('startTimer', ()=>{
     const interval = setInterval(()=>{
       if(currentGame.timer<=0){
@@ -136,7 +138,6 @@ io.on('connection', socket=>{
     },1000);
   });
 
-  // Buzz
   socket.on('buzz', username=>{
     if(!currentGame.activePlayer){
       currentGame.activePlayer=username;
@@ -144,7 +145,6 @@ io.on('connection', socket=>{
     }
   });
 
-  // Antwort auswerten
   socket.on('answer', ({username,correct})=>{
     const multiplier = boards.multiplier||1;
     let points = currentGame.currentQuestion.value*multiplier;
@@ -160,10 +160,9 @@ io.on('connection', socket=>{
     const user = users.find(u=>u.username===username);
     if(user){
       user.score += delta;
-      writeJSON('data/users.json',users); // GitHub Persistenz
+      writeJSON('data/users.json',users);
     }
   }
-
 });
 
 server.listen(3000,()=>console.log('Server läuft auf http://localhost:3000'));

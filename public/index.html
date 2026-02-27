@@ -14,7 +14,6 @@ button:hover{transform:scale(1.05);background:#0099cc;}
 </style>
 </head>
 <body>
-
 <div class="login-container">
 <h2>Jeopardy Login</h2>
 <input id="username" placeholder="Username">
@@ -22,10 +21,8 @@ button:hover{transform:scale(1.05);background:#0099cc;}
 <button onclick="login()">Login</button>
 <div id="errorMsg"></div>
 </div>
-
 <script>
 const socket = io();
-
 function login(){
   const username = document.getElementById("username").value;
   const password = document.getElementById("password").value;
@@ -33,26 +30,17 @@ function login(){
     document.getElementById("errorMsg").innerText="Bitte Username und Passwort eingeben";
     return;
   }
-
   socket.emit('login',{username,password});
 }
-
-// Login Success
 socket.on('loginSuccess', data=>{
   localStorage.setItem("username",data.username);
   localStorage.setItem("role",data.role);
-  if(data.role==="admin"){
-    window.location.href="/admin.html";
-  } else {
-    window.location.href="/board.html";
-  }
+  if(data.role==="admin") window.location.href="/admin.html";
+  else window.location.href="/board.html";
 });
-
-// Login Fail
 socket.on('loginFail', msg=>{
   document.getElementById("errorMsg").innerText = msg;
 });
 </script>
-
 </body>
 </html>

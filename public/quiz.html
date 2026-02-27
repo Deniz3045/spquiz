@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Quizleitung – Admin</title>
+<script src="/socket.io/socket.io.js"></script>
+<style>
+body{margin:0;padding:0;font-family:Arial,sans-serif;background:#0b1e2d;color:white;}
+header{background:#1b3a57;padding:15px;text-align:center;font-size:26px;color:#00c3ff;font-weight:bold;}
+.board-grid{display:grid;grid-template-columns: repeat(5, 1fr);gap:5px;margin:10px;}
+.category-box{background:#145374;text-align:center;padding:10px;font-weight:bold;border-radius:5px;}
+.question-box{background:#1e6091;padding:15px;margin:3px 0;border-radius:5px;cursor:pointer;transition:0.3s;}
+.question-box:hover{transform:scale(1.05);background:#00c3ff;}
+#currentQuestion{margin:20px;padding:15px;background:#1b3a57;border-radius:5px;}
+button{padding:10px;margin:5px;border-radius:5px;border:none;background:#00c3ff;color:white;cursor:pointer;}
+button:hover{background:#0099cc;}
+</style>
+</head>
+<body>
+<header>Quizleitung – Admin</header>
+<div id="quizBoard" class="board-grid"></div>
+<div id="currentQuestion">
+<h3 id="questionText"></h3>
+<p id="questionAnswer" style="color:#00ff99;"></p>
+<button id="showAnswerBtn">Antwort anzeigen</button>
+<button id="startTimerBtn">Timer starten</button>
+<button id="unlockBuzzersBtn">Buzzers freigeben</button>
+</div>
+<div id="timerDisplay" style="font-size:24px;margin-top:10px;"></div>
+
+<script>
+const socket = io();
+let boardData = window.boardData || { categories: [] };
+let currentQ = null;
+
+function renderQuizBoard(){
+  const container = document.getElementById("quizBoard");
+  container.innerHTML="";
+  boardData.categories.forEach((cat,catIdx)=>{
+    const catDiv = document.createElement("div"); catDiv.className="category-box"; catDiv.innerText=cat.name;
+    container.appendChild(catDiv);
+    cat.questions.forEach((q,qIdx)=>{
+      const qDiv = document.createElement("div");
+      qDiv.className="question-box";
+      qDiv.innerText = q.value + " pts";
+      qDiv.onclick=()=>selectQuestion(catIdx,qIdx,q);
+      container.appendChild(qDiv);
+    });
+  });
+}
+
+function selectQuestion(catIdx,qIdx,q){
+  currentQ=q;
+  document.getElementById("questionText").innerText = q.text;
+  document.getElementById("questionAnswer").innerText = q.answer || "Antwort hier";
+  document.getElementById("questionAnswer").style.display="none";
+  socket.emit('selectQuestion',{categoryIndex:catIdx,questionIndex:qIdx,admin:true});
+}
+
+// Buttons
+document.getElementById("showAnswerBtn").onclick = ()=>{document.getElementById("questionAnswer").style.display="block";}
+document.getElementById("startTimerBtn").onclick = ()=>{socket.emit('startTimer');}
+document.getElementById("unlockBuzzersBtn").onclick = ()=>{socket.emit('unlockBuzzers');}
+
+// Timer
+socket.on('timerUpdate', time=>{document.getElementById("timerDisplay").innerText = "Timer: "+time;});
+socket.on('timerEnded', ()=>{document.getElementById("timerDisplay").innerText = "Zeit abgelaufen!";});
+
+renderQuizBoard();
+</script>
+</body>
+</html>

@@ -1,60 +1,27 @@
-<!-- public/quiz.html -->
 <!DOCTYPE html>
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Jeopardy Admin Quiz</title>
+<title>Admin Quiz</title>
 <script src="/socket.io/socket.io.js"></script>
 <link rel="stylesheet" href="quiz.css">
 </head>
 <body>
-<h1>Admin Quiz Sicht</h1>
-
-<!-- Scoreboard -->
-<div id="scoreboard"></div>
-
-<!-- Board -->
+<h1>Admin Quiz</h1>
 <div id="board"></div>
-
-<!-- Fragekontrolle -->
-<div id="questionControl" class="hidden">
-  <h2 id="questionCategory"></h2>
-  <p id="questionText"></p>
-  <p>Antwort: <span id="questionAnswer"></span></p>
-  <p>Wert: <span id="questionValue"></span></p>
-  <button id="startTimerBtn">Timer starten</button>
-  <button id="unlockBuzzersBtn">Buzzers freigeben</button>
-  <p id="timerDisplay"></p>
-  <button id="correctBtn">Richtig</button>
-  <button id="wrongBtn">Falsch</button>
-</div>
 
 <script>
 const socket = io();
-let username = "Admin"; // Admin ist automatisch
-let role = "admin";
-let currentQuestion = null;
-
-// Scoreboard
-const scoreboard = document.getElementById('scoreboard');
-socket.on('scoreUpdate', users=>{
-  scoreboard.innerHTML="<h3>Punkte</h3>";
-  users.forEach(u=>{
-    const div=document.createElement('div');
-    div.textContent=`${u.username}: ${u.score}`;
-    scoreboard.appendChild(div);
-  });
-});
-
-// Board
+socket.emit('getBoard');
 const boardDiv = document.getElementById('board');
+
 socket.on('boardData', board=>{
   boardDiv.innerHTML='';
-  board.categories.forEach((cat,ci)=>{
-    const col=document.createElement('div'); col.className='category';
-    const h=document.createElement('h3'); h.textContent=cat.name; col.appendChild(h);
-    cat.questions.forEach((q,qi)=>{
-      const btn=document.createElement('button');
+  board.categories.forEach((cat, ci)=>{
+    const col = document.createElement('div'); col.className='category';
+    const h = document.createElement('h3'); h.textContent=cat.name; col.appendChild(h);
+    cat.questions.forEach((q, qi)=>{
+      const btn = document.createElement('button');
       btn.textContent=q.value;
       btn.onclick = ()=>socket.emit('selectQuestion',{categoryIndex:ci,questionIndex:qi,admin:true});
       col.appendChild(btn);
@@ -62,43 +29,6 @@ socket.on('boardData', board=>{
     boardDiv.appendChild(col);
   });
 });
-
-// Fragekontrolle
-const questionControl = document.getElementById('questionControl');
-const questionCategory = document.getElementById('questionCategory');
-const questionText = document.getElementById('questionText');
-const questionAnswer = document.getElementById('questionAnswer');
-const questionValue = document.getElementById('questionValue');
-const timerDisplay = document.getElementById('timerDisplay');
-const startTimerBtn = document.getElementById('startTimerBtn');
-const unlockBuzzersBtn = document.getElementById('unlockBuzzersBtn');
-const correctBtn = document.getElementById('correctBtn');
-const wrongBtn = document.getElementById('wrongBtn');
-
-socket.on('questionSelected', q=>{
-  currentQuestion = q;
-  questionControl.classList.remove('hidden');
-  questionCategory.textContent = q.category || '';
-  questionText.textContent = q.text;
-  questionAnswer.textContent = q.answer;
-  questionValue.textContent = q.value;
-  timerDisplay.textContent = '';
-});
-
-startTimerBtn.onclick = ()=>socket.emit('startTimer');
-unlockBuzzersBtn.onclick = ()=>socket.emit('unlockBuzzers');
-
-// Admin Punkte Buttons
-correctBtn.onclick = ()=>{ socket.emit('answer',{username:username,correct:true}); };
-wrongBtn.onclick = ()=>{ socket.emit('answer',{username:username,correct:false}); };
-
-// Timer Update
-socket.on('timerUpdate', t=>{ timerDisplay.textContent=`Timer: ${t}`; });
-socket.on('timerEnded', ()=>{ timerDisplay.textContent="Zeit abgelaufen!"; });
-
-// Buzz Update
-socket.on('buzzUpdate', user=>{ alert(`${user} hat gebuzzt!`); });
-
 </script>
 </body>
 </html>

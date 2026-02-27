@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Admin Panel</title>
+<title>Admin Panel – Jeopardy</title>
 <script src="/socket.io/socket.io.js"></script>
 
 <style>
@@ -13,7 +13,6 @@ body{
   background:#0b1e2d;
   color:white;
 }
-
 header{
   background:#1b3a57;
   padding:15px;
@@ -22,7 +21,6 @@ header{
   color:#00c3ff;
   font-weight:bold;
 }
-
 section{
   max-width:1200px;
   margin:20px auto;
@@ -30,7 +28,6 @@ section{
   background:rgba(0,0,0,0.6);
   border-radius:10px;
 }
-
 h2{color:#00c3ff;}
 input,button,select,textarea{
   padding:10px;
@@ -39,26 +36,22 @@ input,button,select,textarea{
   border:none;
   font-size:16px;
 }
-
 button{
   cursor:pointer;
   background: linear-gradient(45deg,#00c3ff,#0099cc);
   color:white;
   transition:0.3s;
 }
-
 button:hover{
   transform:scale(1.05);
   background: linear-gradient(45deg,#0099cc,#00c3ff);
 }
-
 .board-grid{
   display:grid;
   grid-template-columns: repeat(5, 1fr);
   gap:5px;
   margin-top:10px;
 }
-
 .category-box{
   background:#145374;
   text-align:center;
@@ -66,7 +59,6 @@ button:hover{
   font-weight:bold;
   border-radius:5px;
 }
-
 .question-box{
   background:#1e6091;
   padding:15px;
@@ -75,12 +67,10 @@ button:hover{
   cursor:pointer;
   transition:0.3s;
 }
-
 .question-box:hover{
   transform:scale(1.05);
   background:#00c3ff;
 }
-
 #userList div{
   background:rgba(255,255,255,0.1);
   padding:5px 10px;
@@ -93,14 +83,29 @@ button:hover{
 
 <header>Admin Panel – Jeopardy</header>
 
+<!-- Spieler erstellen -->
 <section>
 <h2>Spieler erstellen</h2>
 <input id="newUser" placeholder="Username">
 <input id="newPass" placeholder="Password">
+<select id="newRole">
+  <option value="player">Player</option>
+  <option value="editor">Editor</option>
+  <option value="admin">Admin</option>
+</select>
 <button onclick="createUser()">Erstellen</button>
 <div id="status"></div>
 </section>
 
+<!-- Board Upload -->
+<section>
+<h2>Board hochladen (.json)</h2>
+<input type="file" id="boardFile" accept=".json">
+<button onclick="uploadBoard()">Upload</button>
+<div id="uploadStatus"></div>
+</section>
+
+<!-- Board Einstellungen -->
 <section>
 <h2>Board Einstellungen</h2>
 <label>Multiplikator: </label>
@@ -110,11 +115,13 @@ button:hover{
 <button onclick="saveBoard()">Board speichern</button>
 </section>
 
+<!-- Board Übersicht -->
 <section>
-<h2>Board Übersicht</h2>
+<h2>Board Übersicht (5x5 Fragen)</h2>
 <div id="boardContainer" class="board-grid"></div>
 </section>
 
+<!-- Spieler Übersicht -->
 <section>
 <h2>Spieler Übersicht</h2>
 <div id="userList"></div>
@@ -130,21 +137,43 @@ const username = localStorage.getItem("username");
 const role = localStorage.getItem("role");
 if(!username || role!=="admin"){ alert("Kein Admin Zugriff"); window.location.href="/"; }
 
-// Spieler erstellen
+// --- Spieler erstellen mit Rolle ---
 function createUser(){
   const u=document.getElementById("newUser").value;
   const p=document.getElementById("newPass").value;
+  const r=document.getElementById("newRole").value;
   if(!u||!p){document.getElementById("status").innerText="Bitte ausfüllen"; return;}
   fetch("/admin/addUser",{
     method:"POST",
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({username:u,password:p})
+    body:JSON.stringify({username:u,password:p,role:r})
   })
   .then(res=>res.text())
-  .then(msg=>{document.getElementById("status").innerText=msg; getUsers();});
+  .then(msg=>{
+    document.getElementById("status").innerText=msg;
+    getUsers();
+  });
 }
 
-// Board laden
+// --- Board Upload (Editor/Admin Berechtigung) ---
+function uploadBoard(){
+  const fileInput = document.getElementById("boardFile");
+  if(fileInput.files.length===0){document.getElementById("uploadStatus").innerText="Keine Datei ausgewählt"; return;}
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const board = JSON.parse(e.target.result);
+    fetch("/admin/uploadBoard",{
+      method:"POST",
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({username:username,board:board})
+    })
+    .then(res=>res.text())
+    .then(msg=>document.getElementById("uploadStatus").innerText=msg);
+  };
+  reader.readAsText(fileInput.files[0]);
+}
+
+// --- Board laden & rendern ---
 socket.emit("getBoard");
 socket.on("boardData",(board)=>{
   boardData = board;
@@ -152,7 +181,6 @@ socket.on("boardData",(board)=>{
   document.getElementById("multiplier").value = board.multiplier||1;
 });
 
-// Board rendern
 function renderBoard(){
   const container = document.getElementById("boardContainer");
   container.innerHTML="";
@@ -165,7 +193,7 @@ function renderBoard(){
     cat.questions.forEach((q,qIdx)=>{
       const qDiv=document.createElement("div");
       qDiv.className="question-box";
-      qDiv.innerText=q.value + " pts";
+      qDiv.innerText = q.value + " pts";
       qDiv.onclick=()=>{
         const newText = prompt("Frage Text bearbeiten:",q.text);
         if(newText!==null) q.text=newText;
@@ -175,7 +203,7 @@ function renderBoard(){
   });
 }
 
-// Board speichern
+// --- Board speichern (Timer & Multiplikator) ---
 function saveBoard(){
   boardData.multiplier = parseInt(document.getElementById("multiplier").value);
   boardData.categories.forEach(cat=>{
@@ -191,7 +219,7 @@ function saveBoard(){
   .then(msg=>{alert(msg);});
 }
 
-// Spieler Liste
+// --- Spieler Liste ---
 function getUsers(){
   fetch("/data/users.json")
   .then(res=>res.json())
@@ -210,6 +238,5 @@ function getUsers(){
 getUsers();
 
 </script>
-
 </body>
 </html>

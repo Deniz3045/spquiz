@@ -2,23 +2,53 @@
   "multiplier": 1,
   "categories": [
     {
-      "name": "Geschichte",
+      "name": "Wissenschaft",
       "questions": [
-        { "question": "Wer war der erste Bundeskanzler?", "answer": "Konrad Adenauer", "value": 100, "timer": 20 },
-        { "question": "Wann begann der 2. Weltkrieg?", "answer": "1939", "value": 200, "timer": 20 },
-        { "question": "Wann fiel die Berliner Mauer?", "answer": "1989", "value": 300, "timer": 25 },
-        { "question": "Wer entdeckte Amerika?", "answer": "Christoph Kolumbus", "value": 400, "timer": 25 },
-        { "question": "Wann wurde die UNO gegründet?", "answer": "1945", "value": 500, "timer": 30 }
+        { "text": "Was ist die chemische Formel von Wasser?", "value": 100, "timer": 20 },
+        { "text": "Wie viele Planeten hat unser Sonnensystem?", "value": 200, "timer": 25 },
+        { "text": "Wer entdeckte die Schwerkraft?", "value": 300, "timer": 30 },
+        { "text": "Was misst die Richter-Skala?", "value": 400, "timer": 35 },
+        { "text": "Was ist die Lichtgeschwindigkeit?", "value": 500, "timer": 40 }
       ]
     },
     {
-      "name": "Wissenschaft",
+      "name": "Geschichte",
       "questions": [
-        { "question": "Chemisches Symbol für Wasser?", "answer": "H2O", "value": 100, "timer": 15 },
-        { "question": "Erfinder der Relativitätstheorie?", "answer": "Albert Einstein", "value": 200, "timer": 20 },
-        { "question": "Größter Planet im Sonnensystem?", "answer": "Jupiter", "value": 300, "timer": 20 },
-        { "question": "Sauerstoff hat welches Atomgewicht?", "answer": "16", "value": 400, "timer": 25 },
-        { "question": "Wie viele Chromosomen hat der Mensch?", "answer": "46", "value": 500, "timer": 30 }
+        { "text": "Wer war der erste Präsident der USA?", "value": 100, "timer": 20 },
+        { "text": "Wann begann der Zweite Weltkrieg?", "value": 200, "timer": 25 },
+        { "text": "Wann fiel die Berliner Mauer?", "value": 300, "timer": 30 },
+        { "text": "Wer war Julius Caesar?", "value": 400, "timer": 35 },
+        { "text": "Wann endete das Römische Reich?", "value": 500, "timer": 40 }
+      ]
+    },
+    {
+      "name": "Geografie",
+      "questions": [
+        { "text": "Was ist die Hauptstadt von Frankreich?", "value": 100, "timer": 20 },
+        { "text": "Welcher Fluss fließt durch London?", "value": 200, "timer": 25 },
+        { "text": "Welches ist das größte Land der Welt?", "value": 300, "timer": 30 },
+        { "text": "Wo liegt der Mount Everest?", "value": 400, "timer": 35 },
+        { "text": "Welches Meer liegt zwischen Afrika und Australien?", "value": 500, "timer": 40 }
+      ]
+    },
+    {
+      "name": "Sport",
+      "questions": [
+        { "text": "Wie viele Spieler hat eine Fußballmannschaft?", "value": 100, "timer": 20 },
+        { "text": "Wer gewann die Fußball-WM 2014?", "value": 200, "timer": 25 },
+        { "text": "Wie viele Punkte ist ein Basketball-Korb wert?", "value": 300, "timer": 30 },
+        { "text": "Welcher Tennisspieler gewann die meisten Grand Slams?", "value": 400, "timer": 35 },
+        { "text": "Wo fanden die Olympischen Spiele 2016 statt?", "value": 500, "timer": 40 }
+      ]
+    },
+    {
+      "name": "Kultur",
+      "questions": [
+        { "text": "Wer schrieb 'Faust'?", "value": 100, "timer": 20 },
+        { "text": "In welchem Land entstand der Tango?", "value": 200, "timer": 25 },
+        { "text": "Wer malte die Mona Lisa?", "value": 300, "timer": 30 },
+        { "text": "Wann wurde die Harry Potter Reihe veröffentlicht?", "value": 400, "timer": 35 },
+        { "text": "Was ist das meistgelesene Buch der Welt?", "value": 500, "timer": 40 }
       ]
     }
   ]

@@ -4,86 +4,25 @@
 <meta charset="UTF-8">
 <title>Admin Panel – Jeopardy</title>
 <script src="/socket.io/socket.io.js"></script>
-
 <style>
-body{
-  font-family:'Arial', sans-serif;
-  margin:0;
-  padding:0;
-  background:#0b1e2d;
-  color:white;
-}
-header{
-  background:#1b3a57;
-  padding:15px;
-  text-align:center;
-  font-size:26px;
-  color:#00c3ff;
-  font-weight:bold;
-}
-section{
-  max-width:1200px;
-  margin:20px auto;
-  padding:20px;
-  background:rgba(0,0,0,0.6);
-  border-radius:10px;
-}
+body{margin:0;padding:0;font-family:Arial,sans-serif;background:#0b1e2d;color:white;}
+header{background:#1b3a57;padding:15px;text-align:center;font-size:26px;color:#00c3ff;font-weight:bold;}
+section{max-width:1200px;margin:20px auto;padding:20px;background:rgba(0,0,0,0.6);border-radius:10px;}
 h2{color:#00c3ff;}
-input,button,select,textarea{
-  padding:10px;
-  margin:5px;
-  border-radius:5px;
-  border:none;
-  font-size:16px;
-}
-button{
-  cursor:pointer;
-  background: linear-gradient(45deg,#00c3ff,#0099cc);
-  color:white;
-  transition:0.3s;
-}
-button:hover{
-  transform:scale(1.05);
-  background: linear-gradient(45deg,#0099cc,#00c3ff);
-}
-.board-grid{
-  display:grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap:5px;
-  margin-top:10px;
-}
-.category-box{
-  background:#145374;
-  text-align:center;
-  padding:10px;
-  font-weight:bold;
-  border-radius:5px;
-}
-.question-box{
-  background:#1e6091;
-  padding:15px;
-  margin:3px 0;
-  border-radius:5px;
-  cursor:pointer;
-  transition:0.3s;
-}
-.question-box:hover{
-  transform:scale(1.05);
-  background:#00c3ff;
-}
-#userList div{
-  background:rgba(255,255,255,0.1);
-  padding:5px 10px;
-  margin:3px 0;
-  border-radius:5px;
-}
+input,button,select,textarea{padding:10px;margin:5px;border-radius:5px;border:none;font-size:16px;}
+button{cursor:pointer;background: linear-gradient(45deg,#00c3ff,#0099cc);color:white;transition:0.3s;}
+button:hover{transform:scale(1.05);background: linear-gradient(45deg,#0099cc,#00c3ff);}
+.board-grid{display:grid;grid-template-columns: repeat(5, 1fr);gap:5px;margin-top:10px;}
+.category-box{background:#145374;text-align:center;padding:10px;font-weight:bold;border-radius:5px;}
+.question-box{background:#1e6091;padding:15px;margin:3px 0;border-radius:5px;cursor:pointer;transition:0.3s;}
+.question-box:hover{transform:scale(1.05);background:#00c3ff;}
+#userList div,#boardList div{background:rgba(255,255,255,0.1);padding:5px 10px;margin:3px 0;border-radius:5px;display:flex;justify-content:space-between;align-items:center;}
 </style>
 </head>
 <body>
 
 <header>Admin Panel – Jeopardy</header>
 
-<!-- Spieler erstellen -->
 <section>
 <h2>Spieler erstellen</h2>
 <input id="newUser" placeholder="Username">
@@ -97,7 +36,6 @@ button:hover{
 <div id="status"></div>
 </section>
 
-<!-- Board Upload -->
 <section>
 <h2>Board hochladen (.json)</h2>
 <input type="file" id="boardFile" accept=".json">
@@ -105,23 +43,17 @@ button:hover{
 <div id="uploadStatus"></div>
 </section>
 
-<!-- Board Einstellungen -->
 <section>
-<h2>Board Einstellungen</h2>
-<label>Multiplikator: </label>
-<input id="multiplier" type="number" value="1" min="1"><br>
-<label>Timer (Sekunden): </label>
-<input id="timerInput" type="number" value="30" min="5"><br>
-<button onclick="saveBoard()">Board speichern</button>
+<h2>Hochgeladene Boards</h2>
+<div id="boardList"></div>
 </section>
 
-<!-- Board Übersicht -->
 <section>
-<h2>Board Übersicht (5x5 Fragen)</h2>
-<div id="boardContainer" class="board-grid"></div>
+<h2>Quiz Leitung</h2>
+<button onclick="openQuiz()">Quiz starten</button>
+<div id="quizBoard" class="board-grid"></div>
 </section>
 
-<!-- Spieler Übersicht -->
 <section>
 <h2>Spieler Übersicht</h2>
 <div id="userList"></div>
@@ -131,112 +63,107 @@ button:hover{
 const socket = io();
 let boardData = null;
 let users = [];
+let uploadedBoards = [];
 
-// Admin Login Check
 const username = localStorage.getItem("username");
 const role = localStorage.getItem("role");
 if(!username || role!=="admin"){ alert("Kein Admin Zugriff"); window.location.href="/"; }
 
-// --- Spieler erstellen mit Rolle ---
-function createUser(){
+async function createUser(){
   const u=document.getElementById("newUser").value;
   const p=document.getElementById("newPass").value;
   const r=document.getElementById("newRole").value;
   if(!u||!p){document.getElementById("status").innerText="Bitte ausfüllen"; return;}
-  fetch("/admin/addUser",{
-    method:"POST",
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({username:u,password:p,role:r})
-  })
-  .then(res=>res.text())
-  .then(msg=>{
-    document.getElementById("status").innerText=msg;
-    getUsers();
-  });
+  const creator = localStorage.getItem("username");
+  const res = await fetch("/admin/addUser",{method:"POST",headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p,role:r,creator})});
+  const msg = await res.text();
+  document.getElementById("status").innerText=msg;
+  getUsers();
 }
 
-// --- Board Upload (Editor/Admin Berechtigung) ---
-function uploadBoard(){
+async function uploadBoard(){
   const fileInput = document.getElementById("boardFile");
   if(fileInput.files.length===0){document.getElementById("uploadStatus").innerText="Keine Datei ausgewählt"; return;}
   const reader = new FileReader();
-  reader.onload = function(e){
+  reader.onload = async function(e){
     const board = JSON.parse(e.target.result);
-    fetch("/admin/uploadBoard",{
-      method:"POST",
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({username:username,board:board})
-    })
-    .then(res=>res.text())
-    .then(msg=>document.getElementById("uploadStatus").innerText=msg);
+    const res = await fetch("/admin/uploadBoard",{method:"POST",headers:{'Content-Type':'application/json'},body:JSON.stringify({username:username,board})});
+    const msg = await res.text();
+    document.getElementById("uploadStatus").innerText=msg;
+    getBoards();
   };
   reader.readAsText(fileInput.files[0]);
 }
 
-// --- Board laden & rendern ---
-socket.emit("getBoard");
-socket.on("boardData",(board)=>{
-  boardData = board;
-  renderBoard();
-  document.getElementById("multiplier").value = board.multiplier||1;
-});
+function renderBoardList(){
+  const container = document.getElementById("boardList");
+  container.innerHTML="";
+  uploadedBoards.forEach((b,idx)=>{
+    const div = document.createElement("div");
+    div.innerHTML = `<span>${b.name} (von: ${b.uploadedBy})</span>
+      <span>
+        <button onclick="renameBoard(${idx})">Umbenennen</button>
+        <button onclick="deleteBoard(${idx})">Löschen</button>
+      </span>`;
+    container.appendChild(div);
+  });
+}
 
-function renderBoard(){
-  const container = document.getElementById("boardContainer");
+function renameBoard(idx){
+  const newName = prompt("Neuer Boardname:", uploadedBoards[idx].name);
+  if(newName){ uploadedBoards[idx].name = newName; renderBoardList(); }
+}
+
+function deleteBoard(idx){
+  if(confirm("Board löschen?")){ uploadedBoards.splice(idx,1); renderBoardList(); }
+}
+
+function openQuiz(){
+  const container = document.getElementById("quizBoard");
   container.innerHTML="";
   if(!boardData || !boardData.categories) return;
   boardData.categories.forEach((cat,catIdx)=>{
-    const catDiv=document.createElement("div");
-    catDiv.className="category-box";
-    catDiv.innerText=cat.name;
+    const catDiv = document.createElement("div"); catDiv.className="category-box"; catDiv.innerText=cat.name;
     container.appendChild(catDiv);
     cat.questions.forEach((q,qIdx)=>{
-      const qDiv=document.createElement("div");
+      const qDiv = document.createElement("div");
       qDiv.className="question-box";
-      qDiv.innerText = q.value + " pts";
+      qDiv.innerText = q.value+" pts";
       qDiv.onclick=()=>{
-        const newText = prompt("Frage Text bearbeiten:",q.text);
-        if(newText!==null) q.text=newText;
+        if(confirm(`Frage auswählen:\n${q.text}`)){
+          socket.emit('selectQuestion',{categoryIndex:catIdx,questionIndex:qIdx,admin:true});
+        }
       };
       container.appendChild(qDiv);
     });
   });
 }
 
-// --- Board speichern (Timer & Multiplikator) ---
-function saveBoard(){
-  boardData.multiplier = parseInt(document.getElementById("multiplier").value);
-  boardData.categories.forEach(cat=>{
-    cat.questions.forEach(q=>{
-      q.timer = parseInt(document.getElementById("timerInput").value);
-    });
-  });
-  fetch("/admin/saveBoard",{
-    method:"POST",
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(boardData)
-  }).then(res=>res.text())
-  .then(msg=>{alert(msg);});
-}
-
-// --- Spieler Liste ---
-function getUsers(){
-  fetch("/data/users.json")
-  .then(res=>res.json())
-  .then(data=>{
-    users = data;
-    const ul = document.getElementById("userList");
-    ul.innerHTML="";
-    users.forEach(u=>{
-      const div = document.createElement("div");
-      div.innerText = u.username + " ("+u.role+") – Score: "+u.score;
-      ul.appendChild(div);
-    });
+async function getUsers(){
+  const res = await fetch("/data/users.json");
+  users = await res.json();
+  const ul = document.getElementById("userList");
+  ul.innerHTML="";
+  users.forEach(u=>{
+    const div = document.createElement("div");
+    div.innerText = `${u.username} (${u.role}) – Score: ${u.score}`;
+    ul.appendChild(div);
   });
 }
 
-getUsers();
+async function getBoards(){
+  const res = await fetch("/data/boards.json");
+  const b = await res.json();
+  uploadedBoards = b.categories ? [b] : [];
+  renderBoardList();
+}
 
+socket.emit('getBoard');
+socket.on('boardData', board=>{
+  boardData = board;
+  getBoards();
+  getUsers();
+});
 </script>
 </body>
 </html>

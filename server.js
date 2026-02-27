@@ -76,6 +76,18 @@ app.post('/admin/saveBoard', async (req,res)=>{
   await saveJSON('data/boards.json', LOCAL_BOARDS, boards);
   res.send('Board gespeichert');
 });
+// --- Boards API ---
+app.get('/admin/boards', async (req,res)=>{
+  res.json(boards.categories.map(b=>({ name: b.name, author: b.author || "Admin"})));
+});
+
+app.post('/admin/createBoard', async (req,res)=>{
+  const { name, author } = req.body;
+  if(!name) return res.status(400).send("Kein Name angegeben");
+  boards.categories.push({ name, author, questions: [] });
+  await saveJSON('data/boards.json', LOCAL_BOARDS, boards);
+  res.send("Board erstellt");
+});
 
 // --- Socket.IO ---
 let currentGame = { activePlayer:null, currentQuestion:null, timer:0, buzzersUnlocked:false };
@@ -123,5 +135,6 @@ io.on('connection', socket=>{
     if(user){ user.score+=delta; saveJSON('data/users.json', LOCAL_USERS, users); }
   }
 });
+
 
 server.listen(3000,()=>console.log('Server läuft auf http://localhost:3000'));

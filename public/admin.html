@@ -1,102 +1,58 @@
-<!-- public/admin.html -->
 <!DOCTYPE html>
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Jeopardy Admin</title>
+<title>Admin Panel</title>
 <script src="/socket.io/socket.io.js"></script>
 <link rel="stylesheet" href="admin.css">
 </head>
 <body>
 <h1>Admin Panel</h1>
 
-<!-- Spielerverwaltung -->
-<section id="user-management">
-  <h2>Spieler & Rollen</h2>
-  <input id="newUsername" placeholder="Username">
-  <input id="newPassword" placeholder="Passwort" type="password">
-  <select id="newRole">
-    <option value="player">Spieler</option>
-    <option value="editor">Editor</option>
-    <option value="admin">Admin</option>
-  </select>
-  <button id="addUserBtn">Spieler hinzufügen</button>
-  <ul id="userList"></ul>
-</section>
+<section>
+<h2>Neuen Spieler hinzufügen</h2>
+<input id="newUsername" placeholder="Benutzername">
+<input id="newPassword" type="password" placeholder="Passwort">
+<select id="newRole">
+  <option value="player">Spieler</option>
+  <option value="editor">Editor</option>
+  <option value="admin">Admin</option>
+</select>
+<button id="addUserBtn">Neuen Spieler hinzufügen</button>
 
-<!-- Boardverwaltung -->
-<section id="board-management">
-  <h2>Boards</h2>
-  <input id="boardName" placeholder="Board Name">
-  <input id="boardMultiplier" type="number" value="1" step="0.1">
-  <textarea id="boardData" placeholder='{"categories":[...]}'></textarea>
-  <button id="uploadBoardBtn">Board hochladen</button>
-  <h3>Vorhandene Boards</h3>
-  <ul id="boardList"></ul>
-</section>
+<h2>Spielerübersicht</h2>
+<ul id="userList"></ul>
 
-<!-- Quiz-Leitung -->
-<section id="quiz-control">
-  <h2>Quiz starten</h2>
-  <button id="startQuizBtn">Board anzeigen</button>
-  <div id="quizWindow"></div>
-</section>
+<h2>Boards</h2>
+<button id="refreshBoardsBtn">Boards laden</button>
+<ul id="boardList"></ul>
 
 <script>
 const socket = io();
+socket.emit('getUsers');
 
-// Spielerverwaltung
-const userList = document.getElementById('userList');
-document.getElementById('addUserBtn').onclick = () => {
+socket.on('usersData', users=>{
+  const ul = document.getElementById('userList');
+  ul.innerHTML='';
+  users.forEach(u=>{
+    const li=document.createElement('li');
+    li.textContent = `${u.username} (${u.role})`;
+    ul.appendChild(li);
+  });
+});
+
+document.getElementById('addUserBtn').onclick = async () => {
   const username = document.getElementById('newUsername').value;
   const password = document.getElementById('newPassword').value;
   const role = document.getElementById('newRole').value;
-  socket.emit('addUser',{username,password,role});
-};
-
-socket.on('userListUpdate', users => {
-  userList.innerHTML='';
-  users.forEach(u=>{
-    const li=document.createElement('li');
-    li.textContent = `${u.username} (${u.role}) - Punkte: ${u.score}`;
-    const select = document.createElement('select');
-    ['player','editor','admin'].forEach(r=>{
-      const option = document.createElement('option');
-      option.value=r; option.text=r; if(r===u.role) option.selected=true;
-      select.appendChild(option);
-    });
-    select.onchange = ()=>socket.emit('changeRole',{username:u.username,role:select.value});
-    li.appendChild(select);
-    userList.appendChild(li);
+  if(!username||!password){ alert("Bitte Username & Passwort eingeben"); return; }
+  const res = await fetch('/admin/addUser',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({username,password,role})
   });
-});
-
-// Boardverwaltung
-const boardList = document.getElementById('boardList');
-document.getElementById('uploadBoardBtn').onclick = () => {
-  const name = document.getElementById('boardName').value;
-  const multiplier = parseFloat(document.getElementById('boardMultiplier').value)||1;
-  let data;
-  try{ data = JSON.parse(document.getElementById('boardData').value); } catch(e){ alert("Ungültige JSON"); return; }
-  data.name = name; data.multiplier = multiplier; socket.emit('uploadBoard',data);
-};
-socket.on('boardListUpdate', boards=>{
-  boardList.innerHTML='';
-  boards.forEach((b,i)=>{
-    const li = document.createElement('li');
-    li.textContent = `${b.name} (Multiplier: ${b.multiplier})`;
-    const selectBtn = document.createElement('button');
-    selectBtn.textContent = "Auswählen";
-    selectBtn.onclick = ()=>socket.emit('selectBoard',i);
-    li.appendChild(selectBtn);
-    boardList.appendChild(li);
-  });
-});
-
-// Quiz-Leitung
-let quizWindow;
-document.getElementById('startQuizBtn').onclick = () => {
-  if(!quizWindow || quizWindow.closed) quizWindow = window.open('quiz.html','QuizWindow','width=1200,height=700');
+  alert(await res.text());
+  socket.emit('getUsers');
 };
 </script>
 </body>

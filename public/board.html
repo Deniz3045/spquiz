@@ -1,9 +1,9 @@
-<!-- public/quiz.html -->
+<!-- public/board.html -->
 <!DOCTYPE html>
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Jeopardy Quiz</title>
+<title>Jeopardy Spieler</title>
 <script src="/socket.io/socket.io.js"></script>
 <link rel="stylesheet" href="quiz.css">
 </head>
@@ -32,6 +32,7 @@ let username = prompt("Gib deinen Benutzernamen ein:");
 let password = prompt("Passwort:");
 let role = 'player';
 
+// Login
 socket.emit('login',{username,password});
 socket.on('loginSuccess', data => {
   username = data.username; role=data.role;
@@ -44,10 +45,10 @@ socket.on('loginFail', msg => alert(msg));
 // Scoreboard
 const scoreboard = document.getElementById('scoreboard');
 socket.on('scoreUpdate', users=>{
-  scoreboard.innerHTML = "<h3>Punkte</h3>";
+  scoreboard.innerHTML="<h3>Punkte</h3>";
   users.forEach(u=>{
-    const div = document.createElement('div');
-    div.textContent = `${u.username}: ${u.score}`;
+    const div=document.createElement('div');
+    div.textContent=`${u.username}: ${u.score}`;
     scoreboard.appendChild(div);
   });
 });
@@ -57,12 +58,12 @@ const boardDiv = document.getElementById('board');
 socket.on('boardData', board=>{
   boardDiv.innerHTML='';
   board.categories.forEach((cat,ci)=>{
-    const col = document.createElement('div'); col.className='category';
-    const h = document.createElement('h3'); h.textContent=cat.name; col.appendChild(h);
+    const col=document.createElement('div'); col.className='category';
+    const h=document.createElement('h3'); h.textContent=cat.name; col.appendChild(h);
     cat.questions.forEach((q,qi)=>{
-      const btn = document.createElement('button');
+      const btn=document.createElement('button');
       btn.textContent=q.value;
-      btn.onclick = ()=>socket.emit('selectQuestion',{categoryIndex:ci,questionIndex:qi,admin:role!=='player'});
+      btn.disabled = true; // Spieler kann Fragen nicht direkt auswählen
       col.appendChild(btn);
     });
     boardDiv.appendChild(col);
@@ -74,23 +75,24 @@ const questionWindow = document.getElementById('questionWindow');
 const questionCategory = document.getElementById('questionCategory');
 const questionText = document.getElementById('questionText');
 const questionValue = document.getElementById('questionValue');
-const buzzBtn = document.getElementById('buzzBtn');
 const timerDisplay = document.getElementById('timerDisplay');
+const buzzBtn = document.getElementById('buzzBtn');
 
 socket.on('questionSelected', q=>{
   questionWindow.classList.remove('hidden');
   questionCategory.textContent = q.category || '';
-  questionText.textContent = q.answerVisible && role!=='player' ? `${q.text} (Antwort: ${q.answer})` : q.text;
+  questionText.textContent = q.text;
   questionValue.textContent = q.value;
   buzzBtn.disabled = true;
 });
 
+// Buzzers freigeben
 socket.on('buzzersUnlocked', ()=>buzzBtn.disabled=false);
 buzzBtn.onclick = ()=>socket.emit('buzz', username);
 
 // Timer
-socket.on('timerUpdate', t => { timerDisplay.textContent = `Timer: ${t}`; });
-socket.on('timerEnded', ()=>{ timerDisplay.textContent = "Zeit abgelaufen!"; });
+socket.on('timerUpdate', t=>{ timerDisplay.textContent=`Timer: ${t}`; });
+socket.on('timerEnded', ()=>{ timerDisplay.textContent="Zeit abgelaufen!"; });
 
 // Buzz Update
 socket.on('buzzUpdate', user=>{

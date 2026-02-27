@@ -7,88 +7,207 @@
 
 <style>
 body{
-    font-family:Arial;
-    background:#111;
-    color:white;
-    padding:20px;
+  font-family:'Arial', sans-serif;
+  margin:0;
+  padding:0;
+  background:#0b1e2d;
+  color:white;
 }
 
-input,button{
-    padding:10px;
-    margin:5px;
+header{
+  background:#1b3a57;
+  padding:15px;
+  text-align:center;
+  font-size:26px;
+  color:#00c3ff;
+  font-weight:bold;
+}
+
+section{
+  max-width:1200px;
+  margin:20px auto;
+  padding:20px;
+  background:rgba(0,0,0,0.6);
+  border-radius:10px;
+}
+
+h2{color:#00c3ff;}
+input,button,select,textarea{
+  padding:10px;
+  margin:5px;
+  border-radius:5px;
+  border:none;
+  font-size:16px;
 }
 
 button{
-    background:#00c3ff;
-    border:none;
-    color:white;
-    cursor:pointer;
+  cursor:pointer;
+  background: linear-gradient(45deg,#00c3ff,#0099cc);
+  color:white;
+  transition:0.3s;
+}
+
+button:hover{
+  transform:scale(1.05);
+  background: linear-gradient(45deg,#0099cc,#00c3ff);
+}
+
+.board-grid{
+  display:grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap:5px;
+  margin-top:10px;
+}
+
+.category-box{
+  background:#145374;
+  text-align:center;
+  padding:10px;
+  font-weight:bold;
+  border-radius:5px;
+}
+
+.question-box{
+  background:#1e6091;
+  padding:15px;
+  margin:3px 0;
+  border-radius:5px;
+  cursor:pointer;
+  transition:0.3s;
+}
+
+.question-box:hover{
+  transform:scale(1.05);
+  background:#00c3ff;
+}
+
+#userList div{
+  background:rgba(255,255,255,0.1);
+  padding:5px 10px;
+  margin:3px 0;
+  border-radius:5px;
 }
 </style>
 </head>
 <body>
 
-<h1>Admin Panel</h1>
+<header>Admin Panel – Jeopardy</header>
 
-<div id="loginCheck"></div>
-
-<hr>
-
+<section>
 <h2>Spieler erstellen</h2>
-
 <input id="newUser" placeholder="Username">
 <input id="newPass" placeholder="Password">
-
 <button onclick="createUser()">Erstellen</button>
+<div id="status"></div>
+</section>
 
-<p id="status"></p>
+<section>
+<h2>Board Einstellungen</h2>
+<label>Multiplikator: </label>
+<input id="multiplier" type="number" value="1" min="1"><br>
+<label>Timer (Sekunden): </label>
+<input id="timerInput" type="number" value="30" min="5"><br>
+<button onclick="saveBoard()">Board speichern</button>
+</section>
 
-<hr>
+<section>
+<h2>Board Übersicht</h2>
+<div id="boardContainer" class="board-grid"></div>
+</section>
 
-<button onclick="logout()">Logout</button>
+<section>
+<h2>Spieler Übersicht</h2>
+<div id="userList"></div>
+</section>
 
 <script>
-
 const socket = io();
+let boardData = null;
+let users = [];
 
+// Admin Login Check
 const username = localStorage.getItem("username");
 const role = localStorage.getItem("role");
+if(!username || role!=="admin"){ alert("Kein Admin Zugriff"); window.location.href="/"; }
 
-if(!username || role !== "admin"){
-    alert("Kein Admin Zugriff");
-    window.location.href="/";
-}
-
-document.getElementById("loginCheck").innerText =
-"Logged in als Admin: " + username;
-
-
+// Spieler erstellen
 function createUser(){
+  const u=document.getElementById("newUser").value;
+  const p=document.getElementById("newPass").value;
+  if(!u||!p){document.getElementById("status").innerText="Bitte ausfüllen"; return;}
+  fetch("/admin/addUser",{
+    method:"POST",
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({username:u,password:p})
+  })
+  .then(res=>res.text())
+  .then(msg=>{document.getElementById("status").innerText=msg; getUsers();});
+}
 
-    const u = document.getElementById("newUser").value;
-    const p = document.getElementById("newPass").value;
+// Board laden
+socket.emit("getBoard");
+socket.on("boardData",(board)=>{
+  boardData = board;
+  renderBoard();
+  document.getElementById("multiplier").value = board.multiplier||1;
+});
 
-    fetch("/admin/addUser",{
-        method:"POST",
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({
-            username:u,
-            password:p
-        })
-    })
-    .then(res=>res.text())
-    .then(msg=>{
-        document.getElementById("status").innerText = msg;
+// Board rendern
+function renderBoard(){
+  const container = document.getElementById("boardContainer");
+  container.innerHTML="";
+  if(!boardData || !boardData.categories) return;
+  boardData.categories.forEach((cat,catIdx)=>{
+    const catDiv=document.createElement("div");
+    catDiv.className="category-box";
+    catDiv.innerText=cat.name;
+    container.appendChild(catDiv);
+    cat.questions.forEach((q,qIdx)=>{
+      const qDiv=document.createElement("div");
+      qDiv.className="question-box";
+      qDiv.innerText=q.value + " pts";
+      qDiv.onclick=()=>{
+        const newText = prompt("Frage Text bearbeiten:",q.text);
+        if(newText!==null) q.text=newText;
+      };
+      container.appendChild(qDiv);
     });
-
+  });
 }
 
-function logout(){
-
-    localStorage.clear();
-    window.location.href="/";
-
+// Board speichern
+function saveBoard(){
+  boardData.multiplier = parseInt(document.getElementById("multiplier").value);
+  boardData.categories.forEach(cat=>{
+    cat.questions.forEach(q=>{
+      q.timer = parseInt(document.getElementById("timerInput").value);
+    });
+  });
+  fetch("/admin/saveBoard",{
+    method:"POST",
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(boardData)
+  }).then(res=>res.text())
+  .then(msg=>{alert(msg);});
 }
+
+// Spieler Liste
+function getUsers(){
+  fetch("/data/users.json")
+  .then(res=>res.json())
+  .then(data=>{
+    users = data;
+    const ul = document.getElementById("userList");
+    ul.innerHTML="";
+    users.forEach(u=>{
+      const div = document.createElement("div");
+      div.innerText = u.username + " ("+u.role+") – Score: "+u.score;
+      ul.appendChild(div);
+    });
+  });
+}
+
+getUsers();
 
 </script>
 

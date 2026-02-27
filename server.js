@@ -3,73 +3,121 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const socketio = require('socket.io');
+const { Octokit } = require('@octokit/rest');
+
+const GITHUB_TOKEN = 'YOUR_GITHUB_TOKEN';
+const REPO_OWNER = 'YOUR_GITHUB_USERNAME';
+const REPO_NAME = 'YOUR_REPO_NAME';
+const BRANCH = 'main';
+
+const octokit = new Octokit({ auth: GITHUB_TOKEN });
 
 const app = express();
 const server = http.createServer(app);
 const io = socketio(server);
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname,'public')));
 app.use(express.json());
 
-// --- Daten laden ---
-let users = JSON.parse(fs.readFileSync('./data/users.json'));
-let boards = JSON.parse(fs.readFileSync('./data/boards.json'));
-let currentGame = { activePlayer:null, currentQuestion:null, timer:0 };
+// --- Helper GitHub Functions ---
+async function readJSON(path){
+  try{
+    const { data } = await octokit.repos.getContent({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      path,
+      ref: BRANCH
+    });
+    const content = Buffer.from(data.content,'base64').toString();
+    return JSON.parse(content);
+  }catch(e){
+    console.log('GitHub read error',e);
+    return [];
+  }
+}
 
-// --- Admin HTTP APIs ---
+async function writeJSON(path,json){
+  try{
+    const existing = await octokit.repos.getContent({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      path,
+      ref: BRANCH
+    }).catch(()=>({data:{sha:null}}));
 
-// Spieler erstellen
-app.post('/admin/addUser', (req,res)=>{
-  const {username,password,role} = req.body;
+    await octokit.repos.createOrUpdateFileContents({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      path,
+      message: 'Update via Jeopardy',
+      content: Buffer.from(JSON.stringify(json,null,2)).toString('base64'),
+      sha: existing.data.sha || undefined,
+      branch: BRANCH
+    });
+  }catch(e){console.log('GitHub write error',e);}
+}
+
+// --- Load initial data ---
+let users = [];
+let boards = { categories: [], multiplier: 1 };
+
+(async ()=>{
+  users = await readJSON('data/users.json');
+  boards = await readJSON('data/boards.json');
+})();
+
+// --- Admin APIs ---
+app.post('/admin/addUser', async(req,res)=>{
+  const {username,password,role,creator} = req.body;
+  const creatorUser = users.find(u=>u.username===creator);
+  if(!creatorUser || creatorUser.role!=='admin') return res.status(403).send('Nur Admins dürfen neue User anlegen');
   if(users.find(u=>u.username===username)) return res.status(400).send('User existiert');
-  users.push({username,password,score:0,role:role || "player"});
-  fs.writeFileSync('./data/users.json', JSON.stringify(users,null,2));
+  users.push({username,password,role:role||'player',score:0});
+  await writeJSON('data/users.json',users);
   res.send('Spieler hinzugefügt');
 });
 
-// Board speichern (Admin)
-app.post('/admin/saveBoard', (req,res)=>{
-  boards = req.body;
-  fs.writeFileSync('./data/boards.json', JSON.stringify(boards,null,2));
+app.post('/admin/saveBoard', async(req,res)=>{
+  const {username} = req.body;
+  const user = users.find(u=>u.username===username);
+  if(!user || (user.role!=='admin' && user.role!=='editor')) return res.status(403).send('Keine Berechtigung');
+  boards = req.body.board;
+  await writeJSON('data/boards.json',boards);
   res.send('Board gespeichert');
 });
 
-// Board hochladen (Editor/Admin)
-app.post('/admin/uploadBoard',(req,res)=>{
-  const {username,board} = req.body;
+app.post('/admin/uploadBoard', async(req,res)=>{
+  const {username, board} = req.body;
   const user = users.find(u=>u.username===username);
-  if(!user || (user.role!=="admin" && user.role!=="editor")) return res.status(403).send('Keine Berechtigung');
-  const filename = './data/'+board.name+'.json';
-  fs.writeFileSync(filename, JSON.stringify(board,null,2));
+  if(!user || (user.role!=='admin' && user.role!=='editor')) return res.status(403).send('Keine Berechtigung');
+  if(!board.name) return res.status(400).send('Board muss einen Namen haben');
+  board.uploadedBy = username;
+  const filename = `data/${board.name}.json`;
+  await writeJSON(filename,board);
   res.send('Board hochgeladen');
 });
 
-// --- Socket.IO Multiplayer ---
+// --- Socket.IO ---
+let currentGame = { activePlayer:null, currentQuestion:null, timer:0 };
 io.on('connection', (socket)=>{
 
-  // Login
   socket.on('login', ({username,password})=>{
     const user = users.find(u=>u.username===username && u.password===password);
     if(user) socket.emit('loginSuccess', {username:user.username,score:user.score,role:user.role});
     else socket.emit('loginFail','Ungültige Daten');
   });
 
-  // Board senden
-  socket.on('getBoard', ()=>{
-    socket.emit('boardData', boards);
-  });
+  socket.on('getBoard', ()=>socket.emit('boardData',boards));
 
-  // Frage auswählen (Admin)
   socket.on('selectQuestion', ({categoryIndex,questionIndex,admin})=>{
     if(admin){
       currentGame.currentQuestion = boards.categories[categoryIndex].questions[questionIndex];
       currentGame.timer = currentGame.currentQuestion.timer || 30;
       currentGame.activePlayer = null;
-      io.emit('questionSelected', currentGame.currentQuestion);
+      io.emit('questionSelected',currentGame.currentQuestion);
     }
   });
 
-  // Timer starten
   socket.on('startTimer', ()=>{
     const interval = setInterval(()=>{
       if(currentGame.timer<=0){
@@ -77,42 +125,36 @@ io.on('connection', (socket)=>{
         io.emit('timerEnded');
       } else{
         currentGame.timer--;
-        io.emit('timerUpdate', currentGame.timer);
+        io.emit('timerUpdate',currentGame.timer);
       }
     },1000);
   });
 
-  // Buzz
   socket.on('buzz',(username)=>{
     if(!currentGame.activePlayer){
       currentGame.activePlayer=username;
-      io.emit('buzzUpdate', currentGame.activePlayer);
+      io.emit('buzzUpdate',currentGame.activePlayer);
     }
   });
 
-  // Antwort auswerten
   socket.on('answer', ({username,correct})=>{
-    const multiplier = boards.multiplier || 1;
-    let points = currentGame.currentQuestion.value * multiplier;
-
-    if(username === currentGame.activePlayer){
-      if(correct) updateScore(username, points);
-      else updateScore(username, -points/2);
-    } else {
-      if(correct) updateScore(username, points/2);
-      else updateScore(username, -points/2);
+    const multiplier = boards.multiplier||1;
+    let points = currentGame.currentQuestion.value*multiplier;
+    if(username===currentGame.activePlayer){
+      correct ? updateScore(username,points) : updateScore(username,-points/2);
+    } else{
+      correct ? updateScore(username,points/2) : updateScore(username,-points/2);
     }
-    io.emit('scoreUpdate', users);
+    io.emit('scoreUpdate',users);
   });
 
-  function updateScore(username, delta){
+  function updateScore(username,delta){
     const user = users.find(u=>u.username===username);
     if(user){
       user.score += delta;
-      fs.writeFileSync('./data/users.json', JSON.stringify(users,null,2));
+      writeJSON('data/users.json',users);
     }
   }
-
 });
 
-server.listen(3000,()=>console.log('Server läuft auf spquiz.onrender.com/index.html'));
+server.listen(3000,()=>console.log('Server läuft auf http://localhost:3000'));

@@ -21,8 +21,10 @@ button:hover{transform:scale(1.05);background:#0099cc;}
 <button onclick="login()">Login</button>
 <div id="errorMsg"></div>
 </div>
+
 <script>
 const socket = io();
+
 function login(){
   const username = document.getElementById("username").value;
   const password = document.getElementById("password").value;
@@ -32,12 +34,14 @@ function login(){
   }
   socket.emit('login',{username,password});
 }
+
 socket.on('loginSuccess', data=>{
   localStorage.setItem("username",data.username);
   localStorage.setItem("role",data.role);
   if(data.role==="admin") window.location.href="/admin.html";
   else window.location.href="/board.html";
 });
+
 socket.on('loginFail', msg=>{
   document.getElementById("errorMsg").innerText = msg;
 });

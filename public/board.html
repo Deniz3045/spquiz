@@ -2,240 +2,117 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Jeopardy Board</title>
+<title>Jeopardy – Spiel</title>
 <script src="/socket.io/socket.io.js"></script>
-
 <style>
-body{
-  font-family:'Arial', sans-serif;
-  margin:0;
-  padding:0;
-  background:#0b1e2d;
-  color:white;
-}
-
-header{
-  background:#1b3a57;
-  padding:15px;
-  text-align:center;
-  font-size:24px;
-  color:#00c3ff;
-  font-weight:bold;
-}
-
-#scoreboard{
-  display:flex;
-  justify-content:center;
-  margin:10px 0;
-  font-size:18px;
-}
-
-#scoreboard div{
-  margin:0 20px;
-  padding:5px 10px;
-  background:rgba(255,255,255,0.1);
-  border-radius:5px;
-}
-
-#board{
-  display:grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap:5px;
-  max-width:1000px;
-  margin:20px auto;
-}
-
-.category{
-  background:#145374;
-  text-align:center;
-  padding:10px;
-  font-weight:bold;
-  font-size:18px;
-  border-radius:5px;
-}
-
-.question-btn{
-  background:#1e6091;
-  color:white;
-  font-size:20px;
-  padding:20px;
-  border:none;
-  border-radius:5px;
-  cursor:pointer;
-  transition:0.3s;
-}
-
-.question-btn:hover{
-  transform: scale(1.05);
-  background:#00c3ff;
-}
-
-#questionModal{
-  position:fixed;
-  top:0;
-  left:0;
-  width:100%;
-  height:100%;
-  background:rgba(0,0,0,0.85);
-  display:none;
-  justify-content:center;
-  align-items:center;
-  flex-direction:column;
-  text-align:center;
-}
-
-#questionModal p{
-  font-size:24px;
-  margin-bottom:20px;
-}
-
-#questionModal button{
-  padding:15px 30px;
-  margin:5px;
-  font-size:18px;
-  border:none;
-  border-radius:5px;
-  cursor:pointer;
-  background:#00c3ff;
-  color:white;
-  transition:0.3s;
-}
-
-#questionModal button:hover{
-  transform: scale(1.05);
-  background:#0099cc;
-}
-
-#timer{
-  font-size:22px;
-  margin-bottom:10px;
-  color:#ffcc00;
-}
-
-#buzzBtn{
-  background:#e63946;
-}
-
-#buzzBtn:hover{
-  background:#ff4d6d;
-}
+body{margin:0;padding:0;font-family:Arial,sans-serif;background:#0b1e2d;color:white;}
+header{background:#1b3a57;padding:15px;text-align:center;font-size:26px;color:#00c3ff;font-weight:bold;}
+.board-grid{display:grid;grid-template-columns: repeat(5, 1fr);gap:5px;margin:20px;}
+.category-box{background:#145374;text-align:center;padding:10px;font-weight:bold;border-radius:5px;}
+.question-box{background:#1e6091;padding:15px;margin:3px 0;border-radius:5px;text-align:center;cursor:pointer;transition:0.3s;}
+.question-box:hover{transform:scale(1.05);background:#00c3ff;}
+#timer{font-size:24px;color:#00ff88;margin:10px;}
+#buzzBtn{padding:15px 30px;font-size:20px;background:#00c3ff;color:white;border:none;border-radius:10px;cursor:pointer;transition:0.3s;}
+#buzzBtn:hover{transform:scale(1.1);}
+#scoreBoard{margin:20px;}
+#scoreBoard div{background:rgba(255,255,255,0.1);padding:5px 10px;margin:3px 0;border-radius:5px;display:flex;justify-content:space-between;}
 </style>
 </head>
 <body>
 
-<header>Jeopardy Board</header>
+<header>Jeopardy – Spieler</header>
 
-<div id="scoreboard">
-  <div id="score1">Spieler1: 0</div>
-  <div id="score2">Spieler2: 0</div>
-  <div id="score3">Spieler3: 0</div>
-</div>
+<div id="timer">Timer: 0</div>
+<button id="buzzBtn" onclick="buzz()" disabled>BUZZ!</button>
 
-<div id="board"></div>
+<div class="board-grid" id="boardContainer"></div>
 
-<!-- Question Modal -->
-<div id="questionModal">
-  <div id="timer"></div>
-  <p id="questionText"></p>
-  <div>
-    <button onclick="answer(true)">Richtig</button>
-    <button onclick="answer(false)">Falsch</button>
-    <button id="buzzBtn" onclick="buzz()">Buzz!</button>
-  </div>
-</div>
+<h2>Scoreboard</h2>
+<div id="scoreBoard"></div>
 
 <script>
 const socket = io();
-let username = localStorage.getItem("username");
-let role = localStorage.getItem("role");
-let currentQuestion = null;
+let boardData = null;
+let username = localStorage.getItem('username');
+let role = localStorage.getItem('role');
+let activeQuestion = null;
+let buzzed = false;
 
-// Scoreboard Daten
-let users = [
-  {username:"Spieler1",score:0},
-  {username:"Spieler2",score:0},
-  {username:"Spieler3",score:0}
-];
+if(!username){ alert("Bitte einloggen"); window.location.href="/"; }
 
-function renderScores(){
-  users.forEach((u,i)=>{
-    const el = document.getElementById("score"+(i+1));
-    if(el) el.innerText = u.username+": "+u.score;
-  });
-}
+// --- Board laden ---
+socket.emit('getBoard');
+socket.on('boardData', board=>{
+  boardData = board;
+  renderBoard();
+});
 
-// --- Board aufbauen ---
-socket.emit("getBoard");
+// --- Board anzeigen ---
+function renderBoard(){
+  const container = document.getElementById('boardContainer');
+  container.innerHTML='';
+  if(!boardData || !boardData.categories) return;
 
-socket.on("boardData",(board)=>{
-  const boardDiv = document.getElementById("board");
-  boardDiv.innerHTML = "";
-
-  // Kategorien
-  board.categories.forEach((cat,index)=>{
-    const catDiv = document.createElement("div");
-    catDiv.className="category";
-    catDiv.innerText=cat.name;
-    boardDiv.appendChild(catDiv);
-  });
-
-  // Fragen
-  for(let q=0;q<5;q++){
-    board.categories.forEach((cat,index)=>{
-      const question = cat.questions[q];
-      const btn = document.createElement("button");
-      btn.className="question-btn";
-      btn.innerText = question.value;
-      btn.onclick = ()=>{
-        if(role==="admin") socket.emit("selectQuestion",{categoryIndex:index,questionIndex:q,admin:true});
-      };
-      boardDiv.appendChild(btn);
+  boardData.categories.forEach(cat=>{
+    const catDiv = document.createElement('div');
+    catDiv.className='category-box';
+    catDiv.innerText = cat.name;
+    container.appendChild(catDiv);
+    cat.questions.forEach(q=>{
+      const qDiv = document.createElement('div');
+      qDiv.className='question-box';
+      qDiv.innerText = q.value + ' pts';
+      container.appendChild(qDiv);
     });
-  }
-});
+  });
+}
 
-// --- Frage Modal ---
-socket.on("questionSelected",(q)=>{
-  currentQuestion = q;
-  document.getElementById("questionText").innerText = q.text;
-  document.getElementById("questionModal").style.display="flex";
-  document.getElementById("timer").innerText = "Timer: "+q.timer;
-  socket.emit("startTimer");
-});
-
-// Timer update
-socket.on("timerUpdate",(t)=>{
-  document.getElementById("timer").innerText="Timer: "+t;
-});
-
-socket.on("timerEnded",()=>{
-  document.getElementById("questionModal").style.display="none";
-});
-
-// Buzz Funktion
+// --- Buzz ---
 function buzz(){
-  socket.emit("buzz", username);
-  document.getElementById("buzzBtn").disabled=true;
+  if(!activeQuestion || buzzed) return;
+  socket.emit('buzz',username);
+  document.getElementById('buzzBtn').disabled=true;
 }
 
-// Antwort Funktion
-function answer(correct){
-  socket.emit("answer",{username,correct});
-  document.getElementById("questionModal").style.display="none";
-}
+// --- Frage ausgewählt ---
+socket.on('questionSelected', q=>{
+  activeQuestion = q;
+  buzzed = false;
+  document.getElementById('timer').innerText=`Timer: ${q.timer || 30}`;
+  document.getElementById('buzzBtn').disabled=false;
+  alert(`Neue Frage:\n${q.text}`);
+});
 
-// Score Update
-socket.on("scoreUpdate",(data)=>{
-  users = data;
-  renderScores();
+// --- Timer Update ---
+socket.on('timerUpdate', t=>{
+  document.getElementById('timer').innerText=`Timer: ${t}`;
+});
+
+// Timer Ende
+socket.on('timerEnded', ()=>{
+  document.getElementById('buzzBtn').disabled=true;
+  activeQuestion = null;
 });
 
 // Buzz Update
-socket.on("buzzUpdate",(player)=>{
-  document.getElementById("timer").innerText="Aktiver Spieler: "+player;
+socket.on('buzzUpdate', player=>{
+  if(player!==username) document.getElementById('buzzBtn').disabled=true;
+  alert(`${player} buzzed!`);
 });
 
-renderScores();
+// Score Update
+socket.on('scoreUpdate', users=>{
+  const container = document.getElementById('scoreBoard');
+  container.innerHTML='';
+  users.forEach(u=>{
+    const div = document.createElement('div');
+    div.innerText = `${u.username} (${u.role})`;
+    const span = document.createElement('span');
+    span.innerText = u.score;
+    div.appendChild(span);
+    container.appendChild(div);
+  });
+});
 </script>
 </body>
 </html>

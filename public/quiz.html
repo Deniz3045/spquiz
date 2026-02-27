@@ -1,72 +1,104 @@
+<!-- public/quiz.html -->
 <!DOCTYPE html>
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Quizleitung – Admin</title>
+<title>Jeopardy Admin Quiz</title>
 <script src="/socket.io/socket.io.js"></script>
-<style>
-body{margin:0;padding:0;font-family:Arial,sans-serif;background:#0b1e2d;color:white;}
-header{background:#1b3a57;padding:15px;text-align:center;font-size:26px;color:#00c3ff;font-weight:bold;}
-.board-grid{display:grid;grid-template-columns: repeat(5, 1fr);gap:5px;margin:10px;}
-.category-box{background:#145374;text-align:center;padding:10px;font-weight:bold;border-radius:5px;}
-.question-box{background:#1e6091;padding:15px;margin:3px 0;border-radius:5px;cursor:pointer;transition:0.3s;}
-.question-box:hover{transform:scale(1.05);background:#00c3ff;}
-#currentQuestion{margin:20px;padding:15px;background:#1b3a57;border-radius:5px;}
-button{padding:10px;margin:5px;border-radius:5px;border:none;background:#00c3ff;color:white;cursor:pointer;}
-button:hover{background:#0099cc;}
-</style>
+<link rel="stylesheet" href="quiz.css">
 </head>
 <body>
-<header>Quizleitung – Admin</header>
-<div id="quizBoard" class="board-grid"></div>
-<div id="currentQuestion">
-<h3 id="questionText"></h3>
-<p id="questionAnswer" style="color:#00ff99;"></p>
-<button id="showAnswerBtn">Antwort anzeigen</button>
-<button id="startTimerBtn">Timer starten</button>
-<button id="unlockBuzzersBtn">Buzzers freigeben</button>
+<h1>Admin Quiz Sicht</h1>
+
+<!-- Scoreboard -->
+<div id="scoreboard"></div>
+
+<!-- Board -->
+<div id="board"></div>
+
+<!-- Fragekontrolle -->
+<div id="questionControl" class="hidden">
+  <h2 id="questionCategory"></h2>
+  <p id="questionText"></p>
+  <p>Antwort: <span id="questionAnswer"></span></p>
+  <p>Wert: <span id="questionValue"></span></p>
+  <button id="startTimerBtn">Timer starten</button>
+  <button id="unlockBuzzersBtn">Buzzers freigeben</button>
+  <p id="timerDisplay"></p>
+  <button id="correctBtn">Richtig</button>
+  <button id="wrongBtn">Falsch</button>
 </div>
-<div id="timerDisplay" style="font-size:24px;margin-top:10px;"></div>
 
 <script>
 const socket = io();
-let boardData = window.boardData || { categories: [] };
-let currentQ = null;
+let username = "Admin"; // Admin ist automatisch
+let role = "admin";
+let currentQuestion = null;
 
-function renderQuizBoard(){
-  const container = document.getElementById("quizBoard");
-  container.innerHTML="";
-  boardData.categories.forEach((cat,catIdx)=>{
-    const catDiv = document.createElement("div"); catDiv.className="category-box"; catDiv.innerText=cat.name;
-    container.appendChild(catDiv);
-    cat.questions.forEach((q,qIdx)=>{
-      const qDiv = document.createElement("div");
-      qDiv.className="question-box";
-      qDiv.innerText = q.value + " pts";
-      qDiv.onclick=()=>selectQuestion(catIdx,qIdx,q);
-      container.appendChild(qDiv);
-    });
+// Scoreboard
+const scoreboard = document.getElementById('scoreboard');
+socket.on('scoreUpdate', users=>{
+  scoreboard.innerHTML="<h3>Punkte</h3>";
+  users.forEach(u=>{
+    const div=document.createElement('div');
+    div.textContent=`${u.username}: ${u.score}`;
+    scoreboard.appendChild(div);
   });
-}
+});
 
-function selectQuestion(catIdx,qIdx,q){
-  currentQ=q;
-  document.getElementById("questionText").innerText = q.text;
-  document.getElementById("questionAnswer").innerText = q.answer || "Antwort hier";
-  document.getElementById("questionAnswer").style.display="none";
-  socket.emit('selectQuestion',{categoryIndex:catIdx,questionIndex:qIdx,admin:true});
-}
+// Board
+const boardDiv = document.getElementById('board');
+socket.on('boardData', board=>{
+  boardDiv.innerHTML='';
+  board.categories.forEach((cat,ci)=>{
+    const col=document.createElement('div'); col.className='category';
+    const h=document.createElement('h3'); h.textContent=cat.name; col.appendChild(h);
+    cat.questions.forEach((q,qi)=>{
+      const btn=document.createElement('button');
+      btn.textContent=q.value;
+      btn.onclick = ()=>socket.emit('selectQuestion',{categoryIndex:ci,questionIndex:qi,admin:true});
+      col.appendChild(btn);
+    });
+    boardDiv.appendChild(col);
+  });
+});
 
-// Buttons
-document.getElementById("showAnswerBtn").onclick = ()=>{document.getElementById("questionAnswer").style.display="block";}
-document.getElementById("startTimerBtn").onclick = ()=>{socket.emit('startTimer');}
-document.getElementById("unlockBuzzersBtn").onclick = ()=>{socket.emit('unlockBuzzers');}
+// Fragekontrolle
+const questionControl = document.getElementById('questionControl');
+const questionCategory = document.getElementById('questionCategory');
+const questionText = document.getElementById('questionText');
+const questionAnswer = document.getElementById('questionAnswer');
+const questionValue = document.getElementById('questionValue');
+const timerDisplay = document.getElementById('timerDisplay');
+const startTimerBtn = document.getElementById('startTimerBtn');
+const unlockBuzzersBtn = document.getElementById('unlockBuzzersBtn');
+const correctBtn = document.getElementById('correctBtn');
+const wrongBtn = document.getElementById('wrongBtn');
 
-// Timer
-socket.on('timerUpdate', time=>{document.getElementById("timerDisplay").innerText = "Timer: "+time;});
-socket.on('timerEnded', ()=>{document.getElementById("timerDisplay").innerText = "Zeit abgelaufen!";});
+socket.on('questionSelected', q=>{
+  currentQuestion = q;
+  questionControl.classList.remove('hidden');
+  questionCategory.textContent = q.category || '';
+  questionText.textContent = q.text;
+  questionAnswer.textContent = q.answer;
+  questionValue.textContent = q.value;
+  timerDisplay.textContent = '';
+});
 
-renderQuizBoard();
+startTimerBtn.onclick = ()=>socket.emit('startTimer');
+unlockBuzzersBtn.onclick = ()=>socket.emit('unlockBuzzers');
+
+// Admin Punkte Buttons
+correctBtn.onclick = ()=>{ socket.emit('answer',{username:username,correct:true}); };
+wrongBtn.onclick = ()=>{ socket.emit('answer',{username:username,correct:false}); };
+
+// Timer Update
+socket.on('timerUpdate', t=>{ timerDisplay.textContent=`Timer: ${t}`; });
+socket.on('timerEnded', ()=>{ timerDisplay.textContent="Zeit abgelaufen!"; });
+
+// Buzz Update
+socket.on('buzzUpdate', user=>{ alert(`${user} hat gebuzzt!`); });
+
 </script>
 </body>
 </html>

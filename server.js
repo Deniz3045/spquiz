@@ -1,19 +1,9 @@
+require('dotenv').config(); // dotenv für Umgebungsvariablen
 const express = require('express');
 const http = require('http');
-const fs = require('fs');
 const path = require('path');
 const socketio = require('socket.io');
 const { Octokit } = require('@octokit/rest');
-
-require('dotenv').config(); // ganz oben
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-const REPO_OWNER  = process.env.GITHUB_USER;
-const REPO_NAME   = process.env.GITHUB_REPO;
-const BRANCH      = process.env.GITHUB_BRANCH || 'main';
-
-const octokit = new (require('@octokit/rest').Octokit)({ auth: GITHUB_TOKEN });
-
-const octokit = new Octokit({ auth: GITHUB_TOKEN });
 
 const app = express();
 const server = http.createServer(app);
@@ -22,7 +12,15 @@ const io = socketio(server);
 app.use(express.static(path.join(__dirname,'public')));
 app.use(express.json());
 
-// --- Helper GitHub Functions ---
+// --- GitHub API Config ---
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+const REPO_OWNER  = process.env.GITHUB_USER;
+const REPO_NAME   = process.env.GITHUB_REPO;
+const BRANCH      = process.env.GITHUB_BRANCH || 'main';
+
+const octokit = new Octokit({ auth: GITHUB_TOKEN });
+
+// --- Helper Functions GitHub ---
 async function readJSON(path){
   try{
     const { data } = await octokit.repos.getContent({
@@ -34,7 +32,7 @@ async function readJSON(path){
     const content = Buffer.from(data.content,'base64').toString();
     return JSON.parse(content);
   }catch(e){
-    console.log('GitHub read error',e);
+    console.log('GitHub read error',path,e.message);
     return [];
   }
 }
@@ -52,15 +50,15 @@ async function writeJSON(path,json){
       owner: REPO_OWNER,
       repo: REPO_NAME,
       path,
-      message: 'Update via Jeopardy',
+      message: 'Update via Jeopardy System',
       content: Buffer.from(JSON.stringify(json,null,2)).toString('base64'),
       sha: existing.data.sha || undefined,
       branch: BRANCH
     });
-  }catch(e){console.log('GitHub write error',e);}
+  }catch(e){console.log('GitHub write error',path,e.message);}
 }
 
-// --- Load initial data ---
+// --- Initial Data ---
 let users = [];
 let boards = { categories: [], multiplier: 1 };
 
@@ -81,10 +79,10 @@ app.post('/admin/addUser', async(req,res)=>{
 });
 
 app.post('/admin/saveBoard', async(req,res)=>{
-  const {username} = req.body;
+  const {username, board} = req.body;
   const user = users.find(u=>u.username===username);
   if(!user || (user.role!=='admin' && user.role!=='editor')) return res.status(403).send('Keine Berechtigung');
-  boards = req.body.board;
+  boards = board;
   await writeJSON('data/boards.json',boards);
   res.send('Board gespeichert');
 });
@@ -100,18 +98,22 @@ app.post('/admin/uploadBoard', async(req,res)=>{
   res.send('Board hochgeladen');
 });
 
-// --- Socket.IO ---
+// --- Socket.IO Multiplayer ---
 let currentGame = { activePlayer:null, currentQuestion:null, timer:0 };
-io.on('connection', (socket)=>{
 
+io.on('connection', socket=>{
+
+  // Login
   socket.on('login', ({username,password})=>{
     const user = users.find(u=>u.username===username && u.password===password);
-    if(user) socket.emit('loginSuccess', {username:user.username,score:user.score,role:user.role});
+    if(user) socket.emit('loginSuccess',{username:user.username,score:user.score,role:user.role});
     else socket.emit('loginFail','Ungültige Daten');
   });
 
+  // Board an alle Spieler
   socket.on('getBoard', ()=>socket.emit('boardData',boards));
 
+  // Admin wählt Frage
   socket.on('selectQuestion', ({categoryIndex,questionIndex,admin})=>{
     if(admin){
       currentGame.currentQuestion = boards.categories[categoryIndex].questions[questionIndex];
@@ -121,6 +123,7 @@ io.on('connection', (socket)=>{
     }
   });
 
+  // Timer starten
   socket.on('startTimer', ()=>{
     const interval = setInterval(()=>{
       if(currentGame.timer<=0){
@@ -133,13 +136,15 @@ io.on('connection', (socket)=>{
     },1000);
   });
 
-  socket.on('buzz',(username)=>{
+  // Buzz
+  socket.on('buzz', username=>{
     if(!currentGame.activePlayer){
       currentGame.activePlayer=username;
       io.emit('buzzUpdate',currentGame.activePlayer);
     }
   });
 
+  // Antwort auswerten
   socket.on('answer', ({username,correct})=>{
     const multiplier = boards.multiplier||1;
     let points = currentGame.currentQuestion.value*multiplier;
@@ -155,9 +160,10 @@ io.on('connection', (socket)=>{
     const user = users.find(u=>u.username===username);
     if(user){
       user.score += delta;
-      writeJSON('data/users.json',users);
+      writeJSON('data/users.json',users); // GitHub Persistenz
     }
   }
+
 });
 
 server.listen(3000,()=>console.log('Server läuft auf http://localhost:3000'));

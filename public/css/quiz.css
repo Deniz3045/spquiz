@@ -1,0 +1,12 @@
+/* public/quiz.css */
+body { font-family: Arial, sans-serif; background:#111; color:#fff; text-align:center; }
+#scoreboard { margin-bottom:20px; }
+#board { display:flex; justify-content:center; gap:10px; flex-wrap:wrap; }
+.category { background:#222; padding:10px; border-radius:10px; min-width:150px; }
+.category h3 { margin-bottom:10px; }
+.category button { display:block; margin:5px auto; padding:10px; width:100%; font-size:16px; border:none; border-radius:5px; background:#555; color:#fff; cursor:pointer; }
+.category button:hover { background:#888; }
+#questionWindow { background:#333; padding:20px; margin:20px auto; border-radius:10px; max-width:600px; }
+#questionWindow.hidden { display:none; }
+#buzzBtn { padding:10px 20px; font-size:18px; background:#0f0; border:none; border-radius:5px; cursor:pointer; }
+#buzzBtn:disabled { background:#555; cursor:not-allowed; }

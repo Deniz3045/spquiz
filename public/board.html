@@ -1,50 +1,102 @@
+<!-- public/quiz.html -->
 <!DOCTYPE html>
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Jeopardy Spieler</title>
+<title>Jeopardy Quiz</title>
 <script src="/socket.io/socket.io.js"></script>
-<style>
-body{margin:0;padding:0;font-family:Arial,sans-serif;background:#0b1e2d;color:white;}
-#currentQuestionPlayer{margin:20px;padding:15px;background:#0b2a42;border-radius:5px; display:none;}
-#buzzerSection{margin-top:10px; display:none;}
-button{padding:10px;margin:5px;border-radius:5px;border:none;background:#00c3ff;color:white;cursor:pointer;}
-button:hover{background:#0099cc;}
-#timerDisplayPlayer{font-size:24px;margin-top:10px;}
-</style>
+<link rel="stylesheet" href="quiz.css">
 </head>
 <body>
-<div id="currentQuestionPlayer">
-<h3 id="questionTextPlayer"></h3>
-<div id="buzzerSection"><button id="buzzBtn">Buzz!</button></div>
+<h1>Jeopardy Quiz</h1>
+
+<!-- Scoreboard -->
+<div id="scoreboard"></div>
+
+<!-- Board -->
+<div id="board"></div>
+
+<!-- Fragefenster -->
+<div id="questionWindow" class="hidden">
+  <h2 id="questionCategory"></h2>
+  <p id="questionText"></p>
+  <p>Wert: <span id="questionValue"></span></p>
+  <button id="buzzBtn" disabled>Buzz!</button>
+  <p id="timerDisplay"></p>
 </div>
-<div id="timerDisplayPlayer"></div>
 
 <script>
 const socket = io();
-let canBuzz = false;
+
+let username = prompt("Gib deinen Benutzernamen ein:");
+let password = prompt("Passwort:");
+let role = 'player';
+
+socket.emit('login',{username,password});
+socket.on('loginSuccess', data => {
+  username = data.username; role=data.role;
+  alert(`Willkommen ${username}! Rolle: ${role}`);
+  socket.emit('getBoard');
+  socket.emit('getUsers');
+});
+socket.on('loginFail', msg => alert(msg));
+
+// Scoreboard
+const scoreboard = document.getElementById('scoreboard');
+socket.on('scoreUpdate', users=>{
+  scoreboard.innerHTML = "<h3>Punkte</h3>";
+  users.forEach(u=>{
+    const div = document.createElement('div');
+    div.textContent = `${u.username}: ${u.score}`;
+    scoreboard.appendChild(div);
+  });
+});
+
+// Board
+const boardDiv = document.getElementById('board');
+socket.on('boardData', board=>{
+  boardDiv.innerHTML='';
+  board.categories.forEach((cat,ci)=>{
+    const col = document.createElement('div'); col.className='category';
+    const h = document.createElement('h3'); h.textContent=cat.name; col.appendChild(h);
+    cat.questions.forEach((q,qi)=>{
+      const btn = document.createElement('button');
+      btn.textContent=q.value;
+      btn.onclick = ()=>socket.emit('selectQuestion',{categoryIndex:ci,questionIndex:qi,admin:role!=='player'});
+      col.appendChild(btn);
+    });
+    boardDiv.appendChild(col);
+  });
+});
+
+// Fragefenster
+const questionWindow = document.getElementById('questionWindow');
+const questionCategory = document.getElementById('questionCategory');
+const questionText = document.getElementById('questionText');
+const questionValue = document.getElementById('questionValue');
+const buzzBtn = document.getElementById('buzzBtn');
+const timerDisplay = document.getElementById('timerDisplay');
 
 socket.on('questionSelected', q=>{
-  document.getElementById("currentQuestionPlayer").style.display="block";
-  document.getElementById("questionTextPlayer").innerText = q.text;
-  document.getElementById("buzzerSection").style.display="none";
-  canBuzz=false;
+  questionWindow.classList.remove('hidden');
+  questionCategory.textContent = q.category || '';
+  questionText.textContent = q.answerVisible && role!=='player' ? `${q.text} (Antwort: ${q.answer})` : q.text;
+  questionValue.textContent = q.value;
+  buzzBtn.disabled = true;
 });
 
-socket.on('buzzersUnlocked', ()=>{
-  document.getElementById("buzzerSection").style.display="block";
-  canBuzz=true;
+socket.on('buzzersUnlocked', ()=>buzzBtn.disabled=false);
+buzzBtn.onclick = ()=>socket.emit('buzz', username);
+
+// Timer
+socket.on('timerUpdate', t => { timerDisplay.textContent = `Timer: ${t}`; });
+socket.on('timerEnded', ()=>{ timerDisplay.textContent = "Zeit abgelaufen!"; });
+
+// Buzz Update
+socket.on('buzzUpdate', user=>{
+  alert(`${user} hat gebuzzt!`);
 });
 
-document.getElementById("buzzBtn").onclick = ()=>{
-  if(canBuzz){
-    socket.emit('buzz', localStorage.getItem('username'));
-    canBuzz=false;
-  }
-};
-
-socket.on('timerUpdate', time=>{document.getElementById("timerDisplayPlayer").innerText = "Timer: "+time;});
-socket.on('timerEnded', ()=>{document.getElementById("timerDisplayPlayer").innerText = "Zeit abgelaufen!";});
 </script>
 </body>
 </html>

@@ -1,0 +1,28 @@
+{
+  "fileName": "geschichte.json",
+  "createdBy": "Deniz",
+  "createdAt": 1700000000000,
+  "boards": [
+    {
+      "id": "hist1",
+      "name": "Antike",
+      "categories": [
+        {
+          "name": "Rom",
+          "questions": [
+            {
+              "question": "Wer war Caesar?",
+              "answer": "Römischer Diktator",
+              "points": 100
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hist2",
+      "name": "Mittelalter",
+      "categories": []
+    }
+  ]
+}

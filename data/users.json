@@ -10,5 +10,12 @@
     "password": "player123",
     "role": "player",
     "score": 0
+  },
+  {
+    "username": "test",
+    "password": "test",
+    "role": "player",
+    "createdBy": "admin",
+    "score": 0
   }
 ]

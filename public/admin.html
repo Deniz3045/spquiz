@@ -3,147 +3,107 @@
 <head>
 <meta charset="UTF-8">
 <title>Admin Panel</title>
-
 <style>
-
-body{
-font-family:Arial;
-background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);
-color:white;
-margin:0;
-}
-
-.container{
-padding:20px;
-}
-
-.card{
-background:rgba(255,255,255,0.05);
-padding:20px;
-margin:10px;
-border-radius:10px;
-}
-
-button{
-background:#00c6ff;
-border:none;
-padding:10px;
-color:white;
-cursor:pointer;
-margin:5px;
-}
-
-input{
-padding:10px;
-margin:5px;
-}
-
+body{font-family:Arial;background:#1a1a1a;color:white;margin:0;padding:0;}
+.container{padding:20px;}
+.card{background:#222;margin:10px;padding:20px;border-radius:10px;}
+input, select{padding:8px;margin:5px;}
+button{padding:8px;background:#00c6ff;border:none;color:white;margin:5px;cursor:pointer;border-radius:5px;}
+h2{margin-top:0;}
 </style>
 </head>
 <body>
-
 <div class="container">
-
 <h1>Admin Panel</h1>
 
 <div class="card">
-
-<h2>User erstellen</h2>
-
-<input id="user" placeholder="Username">
-<input id="pass" placeholder="Password">
-
+<h2>Spieler verwalten</h2>
+<div id="userList"></div>
+<input id="username" placeholder="Username">
+<input id="password" placeholder="Password">
 <select id="role">
 <option value="player">Player</option>
+<option value="editor">Editor</option>
 <option value="admin">Admin</option>
 </select>
-
 <button onclick="addUser()">Erstellen</button>
-
 </div>
 
 <div class="card">
-
 <h2>Board Archiv</h2>
-
-<div id="boards"></div>
-
-<input id="newBoard" placeholder="Board Datei Name">
-
+<div id="boardList"></div>
+<input id="newBoardFile" placeholder="Board Datei Name">
 <button onclick="createBoard()">Erstellen</button>
-
 </div>
-
 </div>
 
 <script>
+async function loadUsers(){
+  const res = await fetch("/api/users");
+  const users = await res.json();
+  userList.innerHTML = "";
+  users.forEach(u=>{
+    const div = document.createElement("div");
+    div.innerHTML = `${u.username} (${u.role}) 
+      <button onclick="deleteUser('${u.username}')">Löschen</button>`;
+    userList.appendChild(div);
+  });
+}
 
 async function addUser(){
+  await fetch("/api/users/create",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      username:username.value,
+      password:password.value,
+      role:role.value
+    })
+  });
+  loadUsers();
+}
 
-await fetch("/api/admin/addUser",{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({
-username:user.value,
-password:pass.value,
-role:role.value
-})
-});
-
-alert("User erstellt");
+async function deleteUser(name){
+  await fetch("/api/users/delete",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({ username:name })
+  });
+  loadUsers();
 }
 
 async function loadBoards(){
-
-const res=await fetch("/api/boards/files");
-
-const files=await res.json();
-
-boards.innerHTML="";
-
-files.forEach(f=>{
-
-boards.innerHTML+=`
-<div>
-${f.file}
-<button onclick="startGame('${f.file}')">Start</button>
-</div>
-`;
-
-});
-
+  const res = await fetch("/api/boards/files");
+  const boards = await res.json();
+  boardList.innerHTML="";
+  boards.forEach(b=>{
+    const div = document.createElement("div");
+    div.innerHTML = `${b.file} erstellt von ${b.createdBy} 
+      <button onclick="startGame('${b.file}')">Start</button>`;
+    boardList.appendChild(div);
+  });
 }
 
 async function createBoard(){
-
-await fetch("/api/boards/create",{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({
-fileName:newBoard.value
-})
-});
-
-loadBoards();
+  await fetch("/api/boards/create",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({ fileName:newBoardFile.value })
+  });
+  loadBoards();
 }
 
 async function startGame(file){
-
-await fetch("/api/game/start",{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({
-file
-})
-});
-
-alert("Quiz gestartet");
-
+  await fetch("/api/game/start",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({ file })
+  });
+  alert("Quiz gestartet");
 }
 
+loadUsers();
 loadBoards();
-
 </script>
-
 </body>
 </html>

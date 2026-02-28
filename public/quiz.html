@@ -1,50 +1,99 @@
 <!DOCTYPE html>
-<html>
+<html lang="de">
 <head>
-<title>Quizmaster</title>
+<meta charset="UTF-8">
+<title>Jeopardy Quiz</title>
+<link rel="stylesheet" href="quiz.css">
 </head>
 <body>
+<div class="container">
+    <header>
+        <h1>Jeopardy Quiz Master</h1>
+        <div id="currentPlayer">Aktiver Spieler: -</div>
+        <div id="timerDisplay">Timer: 0</div>
+    </header>
 
-<h1>Quizmaster</h1>
+    <section class="board" id="board"></section>
 
-<div id="board"></div>
+    <section class="controls" id="controls">
+        <button id="startTimerBtn">Timer starten</button>
+        <button id="resetTimerBtn">Timer zurücksetzen</button>
+    </section>
+</div>
 
+<script src="/socket.io/socket.io.js"></script>
 <script>
+const socket = io();
+let currentQuestion = null;
+let isAdmin = true; // Quiz Master Fenster
+let timerValue = 0;
 
-async function loadGame(){
+// --- Board laden ---
+socket.emit("getBoard");
+socket.on("boardData", board => {
+    renderBoard(board);
+});
 
-const res = await fetch("/api/game");
+// --- Board rendern ---
+function renderBoard(board) {
+    const boardEl = document.getElementById("board");
+    boardEl.innerHTML = "";
+    board.categories.forEach((cat, cIndex) => {
+        const col = document.createElement("div");
+        col.className = "column";
+        const catTitle = document.createElement("div");
+        catTitle.className = "category";
+        catTitle.innerText = cat.name;
+        col.appendChild(catTitle);
 
-const game = await res.json();
-
-if(!game) return;
-
-document.getElementById("board").innerHTML =
-
-game.boards.map(board=>
-
-"<h2>"+board.name+"</h2>"+
-
-board.categories.map(cat=>
-
-"<h3>"+cat.name+"</h3>"+
-
-cat.questions.map(q=>
-
-"<div>"+q.question+
-"<br>Antwort:"+q.answer+"</div>"
-
-).join("")
-
-).join("")
-
-).join("");
-
+        cat.questions.forEach((q, qIndex) => {
+            const btn = document.createElement("button");
+            btn.className = "questionBtn";
+            btn.innerText = q.value;
+            btn.onclick = () => selectQuestion(cIndex, qIndex);
+            col.appendChild(btn);
+        });
+        boardEl.appendChild(col);
+    });
 }
 
-loadGame();
+// --- Frage auswählen ---
+function selectQuestion(cIndex, qIndex) {
+    socket.emit("selectQuestion", { categoryIndex: cIndex, questionIndex: qIndex, admin: true });
+}
 
+// --- Frage vom Server ---
+socket.on("questionSelected", q => {
+    currentQuestion = q;
+    timerValue = q.timer || 30;
+    document.getElementById("timerDisplay").innerText = "Timer: " + timerValue;
+    alert(`Frage: ${q.question}\nAntwort: ${q.answer}`); // Admin sieht Antwort direkt
+});
+
+// --- Timer ---
+document.getElementById("startTimerBtn").addEventListener("click", () => {
+    if(!currentQuestion) return alert("Bitte zuerst eine Frage auswählen!");
+    socket.emit("startTimer");
+});
+
+document.getElementById("resetTimerBtn").addEventListener("click", () => {
+    if(currentQuestion) {
+        timerValue = currentQuestion.timer || 30;
+        document.getElementById("timerDisplay").innerText = "Timer: " + timerValue;
+    }
+});
+
+socket.on("timerUpdate", t => {
+    timerValue = t;
+    document.getElementById("timerDisplay").innerText = "Timer: " + timerValue;
+});
+
+socket.on("timerEnded", () => alert("Zeit abgelaufen!"));
+
+// --- Buzz Updates ---
+socket.on("buzzUpdate", player => {
+    document.getElementById("currentPlayer").innerText = "Aktiver Spieler: " + player;
+});
 </script>
-
 </body>
 </html>

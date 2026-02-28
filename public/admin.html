@@ -2,34 +2,38 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Admin Panel</title>
+<title>Admin Panel - Jeopardy</title>
 <link rel="stylesheet" href="admin.css">
 </head>
 <body>
 <div class="container">
-    <h1>Admin Panel</h1>
+    <header>
+        <h1>Jeopardy Admin Panel</h1>
+    </header>
 
-    <!-- Spielerverwaltung -->
-    <div class="card">
-        <h2>Spieler verwalten</h2>
-        <div id="userList">Lade Spieler...</div>
-        <input id="username" placeholder="Username">
-        <input id="password" placeholder="Password">
-        <select id="role">
-            <option value="player">Player</option>
-            <option value="editor">Editor</option>
-            <option value="admin">Admin</option>
-        </select>
-        <button id="createUserBtn">Erstellen</button>
-    </div>
+    <section class="card">
+        <h2>Spielerverwaltung</h2>
+        <div id="userList" class="list">Lade Spieler...</div>
+        <div class="form-row">
+            <input id="username" placeholder="Username">
+            <input id="password" placeholder="Passwort">
+            <select id="role">
+                <option value="player">Player</option>
+                <option value="editor">Editor</option>
+                <option value="admin">Admin</option>
+            </select>
+            <button id="createUserBtn">Erstellen</button>
+        </div>
+    </section>
 
-    <!-- Board Verwaltung -->
-    <div class="card">
+    <section class="card">
         <h2>Board Archiv</h2>
-        <div id="boardList">Lade Boards...</div>
-        <input id="newBoardFile" placeholder="Board Datei Name">
-        <button id="createBoardBtn">Erstellen</button>
-    </div>
+        <div id="boardList" class="list">Lade Boards...</div>
+        <div class="form-row">
+            <input id="newBoardFile" placeholder="Neues Board Name">
+            <button id="createBoardBtn">Erstellen</button>
+        </div>
+    </section>
 </div>
 
 <script>
@@ -38,14 +42,14 @@ async function fetchJSON(url, options) {
     return res.json();
 }
 
-// --- Spielerliste ---
+// Spielerliste laden
 async function loadUsers() {
     const users = await fetchJSON("/api/users");
     const userListEl = document.getElementById("userList");
     userListEl.innerHTML = "";
     users.forEach(u => {
         const div = document.createElement("div");
-        div.className = "userRow";
+        div.className = "row";
         div.innerHTML = `
             <span>${u.username} (${u.role})</span>
             <button onclick="deleteUser('${u.username}')">Löschen</button>
@@ -56,44 +60,42 @@ async function loadUsers() {
 
 // Spieler erstellen
 async function addUser() {
-    const username = document.getElementById("username").value;
-    const password = document.getElementById("password").value;
+    const username = document.getElementById("username").value.trim();
+    const password = document.getElementById("password").value.trim();
     const role = document.getElementById("role").value;
 
-    if (!username || !password) {
-        alert("Bitte Username und Passwort eingeben!");
-        return;
-    }
+    if(!username || !password) { alert("Username und Passwort angeben!"); return; }
 
     await fetchJSON("/api/users/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password, role })
+        method:"POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({username,password,role})
     });
-    document.getElementById("username").value = "";
-    document.getElementById("password").value = "";
+
+    document.getElementById("username").value="";
+    document.getElementById("password").value="";
     loadUsers();
 }
 
 // Spieler löschen
 async function deleteUser(username) {
-    if (!confirm(`Spieler ${username} wirklich löschen?`)) return;
+    if(!confirm(`Spieler ${username} wirklich löschen?`)) return;
     await fetchJSON("/api/users/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username })
+        method:"POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({username})
     });
     loadUsers();
 }
 
-// --- Boards ---
+// Boards laden
 async function loadBoards() {
     const boards = await fetchJSON("/api/boards/files");
     const boardListEl = document.getElementById("boardList");
     boardListEl.innerHTML = "";
     boards.forEach(b => {
         const div = document.createElement("div");
-        div.className = "boardRow";
+        div.className = "row";
         div.innerHTML = `
             <span>${b.file} (erstellt von: ${b.createdBy})</span>
             <button onclick="startGame('${b.file}')">Quiz starten</button>
@@ -104,33 +106,36 @@ async function loadBoards() {
 
 // Neues Board erstellen
 async function createBoard() {
-    const fileName = document.getElementById("newBoardFile").value;
-    if (!fileName) { alert("Bitte Dateinamen eingeben!"); return; }
+    const fileName = document.getElementById("newBoardFile").value.trim();
+    if(!fileName) { alert("Board Name angeben!"); return; }
     await fetchJSON("/api/boards/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fileName })
+        method:"POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({fileName})
     });
-    document.getElementById("newBoardFile").value = "";
+    document.getElementById("newBoardFile").value="";
     loadBoards();
 }
 
-// Quiz starten
+// Quiz starten und Quiz Master öffnen
 async function startGame(file) {
-    if (!confirm(`Quiz mit Board ${file} starten?`)) return;
+    if(!confirm(`Quiz mit Board ${file} starten?`)) return;
+
     await fetchJSON("/api/game/start", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ file })
+        method:"POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({file})
     });
-    alert("Quiz gestartet!");
+
+    // Neues Fenster für Quiz Master
+    window.open("/quiz.html","_blank","width=1200,height=800");
 }
 
-// --- Event Listener ---
+// Event Listener
 document.getElementById("createUserBtn").addEventListener("click", addUser);
 document.getElementById("createBoardBtn").addEventListener("click", createBoard);
 
-// --- Initial ---
+// Initial laden
 loadUsers();
 loadBoards();
 </script>

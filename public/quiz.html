@@ -1,34 +1,50 @@
 <!DOCTYPE html>
-<html lang="de">
+<html>
 <head>
-<meta charset="UTF-8">
-<title>Admin Quiz</title>
-<script src="/socket.io/socket.io.js"></script>
-<link rel="stylesheet" href="quiz.css">
+<title>Quizmaster</title>
 </head>
 <body>
-<h1>Admin Quiz</h1>
+
+<h1>Quizmaster</h1>
+
 <div id="board"></div>
 
 <script>
-const socket = io();
-socket.emit('getBoard');
-const boardDiv = document.getElementById('board');
 
-socket.on('boardData', board=>{
-  boardDiv.innerHTML='';
-  board.categories.forEach((cat, ci)=>{
-    const col = document.createElement('div'); col.className='category';
-    const h = document.createElement('h3'); h.textContent=cat.name; col.appendChild(h);
-    cat.questions.forEach((q, qi)=>{
-      const btn = document.createElement('button');
-      btn.textContent=q.value;
-      btn.onclick = ()=>socket.emit('selectQuestion',{categoryIndex:ci,questionIndex:qi,admin:true});
-      col.appendChild(btn);
-    });
-    boardDiv.appendChild(col);
-  });
-});
+async function loadGame(){
+
+const res = await fetch("/api/game");
+
+const game = await res.json();
+
+if(!game) return;
+
+document.getElementById("board").innerHTML =
+
+game.boards.map(board=>
+
+"<h2>"+board.name+"</h2>"+
+
+board.categories.map(cat=>
+
+"<h3>"+cat.name+"</h3>"+
+
+cat.questions.map(q=>
+
+"<div>"+q.question+
+"<br>Antwort:"+q.answer+"</div>"
+
+).join("")
+
+).join("")
+
+).join("");
+
+}
+
+loadGame();
+
 </script>
+
 </body>
 </html>

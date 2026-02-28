@@ -7,97 +7,293 @@
 <link rel="stylesheet" href="admin.css">
 </head>
 <body>
+
 <h1>Admin Panel</h1>
 
-<section>
-<h2>Neuen Spieler hinzufügen</h2>
-<input id="newUsername" placeholder="Benutzername">
-<input id="newPassword" type="password" placeholder="Passwort">
-<select id="newRole">
-  <option value="player">Spieler</option>
-  <option value="editor">Editor</option>
-  <option value="admin">Admin</option>
+<div class="container">
+
+<!-- USER MANAGEMENT -->
+
+<div class="panel">
+
+<h2>User erstellen</h2>
+
+<input id="username" placeholder="Username">
+<input id="password" placeholder="Password">
+
+<select id="role">
+<option value="player">Player</option>
+<option value="editor">Editor</option>
+<option value="admin">Admin</option>
 </select>
-<button id="addUserBtn">Neuen Spieler hinzufügen</button>
 
-<h2>Spielerübersicht</h2>
-<ul id="userList"></ul>
+<button onclick="createUser()">Erstellen</button>
 
-<h2>Boards verwalten</h2>
-<button id="refreshBoardsBtn">Boards laden</button>
-<ul id="boardList"></ul>
+<h3>User Liste</h3>
 
-<h3>Neues Board erstellen</h3>
-<input id="newBoardName" placeholder="Board Name">
-<button id="createBoardBtn">Board erstellen</button>
+<div id="userList"></div>
+
+</div>
+
+
+<!-- BOARD EDITOR -->
+
+<div class="panel">
+
+<h2>Board Editor</h2>
+
+<label>Board Name:</label>
+<input id="boardName">
+
+<label>Multiplikator:</label>
+<input id="multiplier" type="number" value="1">
+
+<button onclick="addCategory()">Kategorie hinzufügen</button>
+
+<button onclick="saveBoard()">Board speichern</button>
+
+<div id="categories"></div>
+
+</div>
+
+</div>
 
 <script>
-const socket = io();
-let currentUser = null;
 
-// --- Spieler laden ---
-socket.emit('getUsers');
-socket.on('usersData', users=>{
-  const ul = document.getElementById('userList');
-  ul.innerHTML='';
-  users.forEach(u=>{
-    const li=document.createElement('li');
-    li.textContent = `${u.username} (${u.role})`;
-    ul.appendChild(li);
-  });
+const socket = io();
+
+let board = {
+
+multiplier: 1,
+
+categories: []
+
+};
+
+
+// LOAD USERS
+
+async function loadUsers(){
+
+const res = await fetch("/admin/users");
+
+const users = await res.json();
+
+const list = document.getElementById("userList");
+
+list.innerHTML = "";
+
+users.forEach(u=>{
+
+const div = document.createElement("div");
+
+div.innerText = u.username + " ("+u.role+") Score:"+u.score;
+
+list.appendChild(div);
+
 });
 
-// --- Neuer Spieler ---
-document.getElementById('addUserBtn').onclick = async () => {
-  const username = document.getElementById('newUsername').value;
-  const password = document.getElementById('newPassword').value;
-  const role = document.getElementById('newRole').value;
-  if(!username||!password){ alert("Bitte Username & Passwort eingeben"); return; }
-  const res = await fetch('/admin/addUser',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({username,password,role})
-  });
-  alert(await res.text());
-  socket.emit('getUsers');
+}
+
+
+// CREATE USER
+
+async function createUser(){
+
+const username = document.getElementById("username").value;
+
+const password = document.getElementById("password").value;
+
+const role = document.getElementById("role").value;
+
+await fetch("/admin/addUser",{
+
+method:"POST",
+
+headers:{ "Content-Type":"application/json" },
+
+body:JSON.stringify({username,password,role})
+
+});
+
+loadUsers();
+
+}
+
+
+// LOAD BOARD
+
+async function loadBoard(){
+
+const res = await fetch("/admin/boards");
+
+board = await res.json();
+
+document.getElementById("boardName").value = board.name || "";
+
+document.getElementById("multiplier").value = board.multiplier;
+
+renderCategories();
+
+}
+
+
+// SAVE BOARD
+
+async function saveBoard(){
+
+board.name = document.getElementById("boardName").value;
+
+board.multiplier = parseInt(document.getElementById("multiplier").value);
+
+await fetch("/admin/saveBoard",{
+
+method:"POST",
+
+headers:{ "Content-Type":"application/json" },
+
+body:JSON.stringify(board)
+
+});
+
+alert("Board gespeichert");
+
+}
+
+
+// CATEGORY
+
+function addCategory(){
+
+board.categories.push({
+
+name:"Neue Kategorie",
+
+questions:[]
+
+});
+
+renderCategories();
+
+}
+
+
+// QUESTION
+
+function addQuestion(catIndex){
+
+board.categories[catIndex].questions.push({
+
+text:"Neue Frage",
+
+answer:"Antwort",
+
+value:100,
+
+timer:30
+
+});
+
+renderCategories();
+
+}
+
+
+// RENDER
+
+function renderCategories(){
+
+const container = document.getElementById("categories");
+
+container.innerHTML="";
+
+board.categories.forEach((cat,ci)=>{
+
+const div = document.createElement("div");
+
+div.className="category";
+
+const title = document.createElement("input");
+
+title.value = cat.name;
+
+title.oninput = ()=>{
+
+cat.name = title.value;
+
 };
 
-// --- Boards laden ---
-async function loadBoards(){
-  const res = await fetch('/admin/boards');
-  const data = await res.json();
-  const ul = document.getElementById('boardList');
-  ul.innerHTML='';
-  data.forEach(b=>{
-    const li=document.createElement('li');
-    li.textContent = `${b.name} (erstellt von: ${b.author})`;
-    const editBtn = document.createElement('button');
-    editBtn.textContent="Bearbeiten";
-    editBtn.onclick = ()=>editBoard(b.name);
-    li.appendChild(editBtn);
-    ul.appendChild(li);
-  });
-}
-document.getElementById('refreshBoardsBtn').onclick = loadBoards;
-loadBoards();
+div.appendChild(title);
 
-// --- Neues Board erstellen ---
-document.getElementById('createBoardBtn').onclick = async ()=>{
-  const name = document.getElementById('newBoardName').value;
-  if(!name){ alert("Bitte Boardnamen eingeben"); return; }
-  const res = await fetch('/admin/createBoard',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({name,author:"Admin"})
-  });
-  alert(await res.text());
-  loadBoards();
-};
+const addQ = document.createElement("button");
 
-// --- Board bearbeiten (öffnet Admin Quiz Fenster) ---
-function editBoard(name){
-  window.open(`/quiz.html?board=${encodeURIComponent(name)}`, '_blank','width=1200,height=800');
+addQ.innerText="Frage hinzufügen";
+
+addQ.onclick=()=>addQuestion(ci);
+
+div.appendChild(addQ);
+
+
+cat.questions.forEach((q,qi)=>{
+
+const qDiv = document.createElement("div");
+
+qDiv.className="question";
+
+const text = document.createElement("input");
+
+text.value=q.text;
+
+text.oninput=()=>q.text=text.value;
+
+const answer = document.createElement("input");
+
+answer.value=q.answer;
+
+answer.oninput=()=>q.answer=answer.value;
+
+const value = document.createElement("input");
+
+value.type="number";
+
+value.value=q.value;
+
+value.oninput=()=>q.value=parseInt(value.value);
+
+const timer = document.createElement("input");
+
+timer.type="number";
+
+timer.value=q.timer;
+
+timer.oninput=()=>q.timer=parseInt(timer.value);
+
+qDiv.appendChild(text);
+
+qDiv.appendChild(answer);
+
+qDiv.appendChild(value);
+
+qDiv.appendChild(timer);
+
+div.appendChild(qDiv);
+
+});
+
+container.appendChild(div);
+
+});
+
 }
+
+
+// INIT
+
+loadUsers();
+
+loadBoard();
+
 </script>
+
 </body>
 </html>

@@ -8,11 +8,21 @@
 <body>
 <div class="container">
     <h1>Board Editor</h1>
-    <input id="boardName" placeholder="Board Name">
-    <button id="loadBtn">Laden</button>
-    <button id="saveBtn">Speichern</button>
 
+    <!-- Board Auswahl / neu -->
+    <div class="board-controls">
+        <input id="boardName" placeholder="Board Name">
+        <button id="createBoardBtn">Neues Board erstellen</button>
+        <select id="boardSelect"></select>
+        <button id="loadBoardBtn">Board laden</button>
+        <label>Multiplier: <input type="number" id="boardMultiplier" value="1" min="1"></label>
+        <button id="saveBoardBtn">Board speichern</button>
+    </div>
+
+    <!-- Kategorien Liste -->
     <div id="categoriesList"></div>
+
+    <!-- Neue Kategorie -->
     <div class="form-row">
         <input id="categoryName" placeholder="Neue Kategorie">
         <button id="addCategoryBtn">Hinzufügen</button>
@@ -22,27 +32,128 @@
 <script>
 async function fetchJSON(url,options){ const res=await fetch(url,options); return res.json(); }
 
-document.getElementById("addCategoryBtn").addEventListener("click",()=>{
+// Board Dateien laden
+async function loadBoardsList(){
+    const boards = await fetchJSON("/api/boards/files");
+    const select = document.getElementById("boardSelect");
+    select.innerHTML="";
+    boards.forEach(b=>{
+        const opt=document.createElement("option");
+        opt.value=b.file;
+        opt.innerText=b.file;
+        select.appendChild(opt);
+    });
+}
+
+// Neues Board erstellen
+document.getElementById("createBoardBtn").addEventListener("click", async ()=>{
+    const name=document.getElementById("boardName").value.trim();
+    if(!name) return alert("Board Name angeben!");
+    await fetchJSON("/api/boards/create",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({fileName:name})});
+    await loadBoardsList();
+    alert("Neues Board erstellt!");
+});
+
+// Board laden
+document.getElementById("loadBoardBtn").addEventListener("click", async ()=>{
+    const file=document.getElementById("boardSelect").value;
+    if(!file) return alert("Bitte ein Board auswählen!");
+    const board = await fetchJSON(`/api/boards/load?file=${file}`);
+    window.currentBoard = board;
+    renderBoard();
+    document.getElementById("boardMultiplier").value = board.multiplier || 1;
+});
+
+// Kategorie hinzufügen
+document.getElementById("addCategoryBtn").addEventListener("click", ()=>{
     const name=document.getElementById("categoryName").value.trim();
     if(!name) return;
-    const list=document.getElementById("categoriesList");
-    const div=document.createElement("div");
-    div.className="categoryRow";
-    div.innerHTML=`<span>${name}</span> <button onclick="this.parentNode.remove()">Löschen</button>`;
-    list.appendChild(div);
+    if(!window.currentBoard) window.currentBoard={categories:[],multiplier:1};
+    window.currentBoard.categories.push({name,questions:[]});
+    renderBoard();
     document.getElementById("categoryName").value="";
 });
 
-document.getElementById("saveBtn").addEventListener("click", async ()=>{
-    const boardName=document.getElementById("boardName").value.trim();
-    if(!boardName) return alert("Board Name angeben!");
-    const categories=[];
-    document.querySelectorAll(".categoryRow span").forEach(s=>categories.push({name:s.innerText,questions:[]}));
-    const boardData={categories,multiplier:1};
-    await fetchJSON("/api/boards/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({fileName:boardName+".json",boardData})});
+// Board speichern
+document.getElementById("saveBoardBtn").addEventListener("click", async ()=>{
+    if(!window.currentBoard) return alert("Kein Board geladen!");
+    window.currentBoard.multiplier = parseFloat(document.getElementById("boardMultiplier").value) || 1;
+    const file=document.getElementById("boardSelect").value || document.getElementById("boardName").value.trim();
+    if(!file) return alert("Bitte Board Name angeben!");
+    await fetchJSON("/api/boards/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({fileName:file,fileName:file,boardData:window.currentBoard})});
     alert("Board gespeichert!");
+    await loadBoardsList();
 });
 
+// Board rendern
+function renderBoard(){
+    const container=document.getElementById("categoriesList");
+    container.innerHTML="";
+    window.currentBoard.categories.forEach((cat,cIndex)=>{
+        const catDiv=document.createElement("div");
+        catDiv.className="categoryDiv";
+        catDiv.innerHTML=`<h3>${cat.name}</h3><button onclick="deleteCategory(${cIndex})">Kategorie löschen</button>`;
+
+        // Fragen
+        cat.questions.forEach((q,qIndex)=>{
+            const qDiv=document.createElement("div");
+            qDiv.className="questionDiv";
+            qDiv.innerHTML=`<span>${q.value} Punkte - ${q.question} (Timer: ${q.timer || 30}s)</span>
+                            <button onclick="editQuestion(${cIndex},${qIndex})">Bearbeiten</button>
+                            <button onclick="deleteQuestion(${cIndex},${qIndex})">Löschen</button>`;
+            catDiv.appendChild(qDiv);
+        });
+
+        // Frage hinzufügen
+        const addQBtn = document.createElement("button");
+        addQBtn.innerText="Frage hinzufügen";
+        addQBtn.onclick=()=>addQuestion(cIndex);
+        catDiv.appendChild(addQBtn);
+
+        container.appendChild(catDiv);
+    });
+}
+
+// Kategorie löschen
+function deleteCategory(index){
+    window.currentBoard.categories.splice(index,1);
+    renderBoard();
+}
+
+// Frage hinzufügen
+function addQuestion(cIndex){
+    const question = prompt("Frage eingeben:");
+    if(!question) return;
+    const answer = prompt("Antwort eingeben:");
+    if(answer===null) return;
+    const value = parseInt(prompt("Punktewert (100/200/...)")||"100");
+    const timer = parseInt(prompt("Timer in Sekunden")||"30");
+    window.currentBoard.categories[cIndex].questions.push({question,answer,value,timer});
+    renderBoard();
+}
+
+// Frage bearbeiten
+function editQuestion(cIndex,qIndex){
+    const qObj = window.currentBoard.categories[cIndex].questions[qIndex];
+    const question = prompt("Frage bearbeiten:",qObj.question);
+    if(!question) return;
+    const answer = prompt("Antwort bearbeiten:",qObj.answer);
+    if(answer===null) return;
+    const value = parseInt(prompt("Punktewert:",qObj.value)||qObj.value);
+    const timer = parseInt(prompt("Timer in Sekunden:",qObj.timer||30));
+    qObj.question=question; qObj.answer=answer; qObj.value=value; qObj.timer=timer;
+    renderBoard();
+}
+
+// Frage löschen
+function deleteQuestion(cIndex,qIndex){
+    window.currentBoard.categories[cIndex].questions.splice(qIndex,1);
+    renderBoard();
+}
+
+// Init
+loadBoardsList();
+window.currentBoard={categories:[],multiplier:1};
 </script>
 </body>
 </html>

@@ -2,62 +2,57 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Login - Jeopardy</title>
-<link rel="stylesheet" href="login.css">
+<title>Quiz Login</title>
+<link rel="stylesheet" href="css/login.css">
 </head>
 <body>
-<div class="login-container">
-    <h1>Jeopardy Login</h1>
-    <input type="text" id="username" placeholder="Benutzername">
-    <input type="password" id="password" placeholder="Passwort">
-    <button id="loginBtn">Login</button>
-    <div id="loginMessage"></div>
+
+<div class="login-box">
+<h1>Quiz Login</h1>
+
+<input id="username" placeholder="Username">
+<input id="password" type="password" placeholder="Password">
+
+<button onclick="login()">Login</button>
+
+<div id="error"></div>
 </div>
 
 <script>
-async function login() {
-    const username = document.getElementById("username").value;
-    const password = document.getElementById("password").value;
-    const messageEl = document.getElementById("loginMessage");
 
-    if(!username || !password){
-        messageEl.innerText = "Bitte Benutzername und Passwort eingeben!";
-        return;
-    }
+async function login(){
 
-    try {
-        const res = await fetch("/api/login", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username, password })
-        });
-        const data = await res.json();
-        if(data.success){
-            messageEl.innerText = "Login erfolgreich!";
-            // Weiterleitung je nach Rolle
-            setTimeout(() => {
-                if(data.role === "admin"){
-                    window.location.href = "/admin.html";
-                } else {
-                    window.location.href = "/board.html"; // Spieler-Board
-                }
-            }, 500);
-        } else {
-            messageEl.innerText = "Ungültige Daten!";
-        }
-    } catch(err){
-        console.error(err);
-        messageEl.innerText = "Fehler beim Login!";
-    }
+const username = document.getElementById("username").value;
+const password = document.getElementById("password").value;
+
+const res = await fetch("/api/login",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({username,password})
+});
+
+const data = await res.json();
+
+if(!data.success){
+
+document.getElementById("error").innerText="Login fehlgeschlagen";
+return;
+
 }
 
-// Button Click
-document.getElementById("loginBtn").addEventListener("click", login);
+if(data.role==="admin"){
 
-// Enter Taste
-document.addEventListener("keydown", e => {
-    if(e.key === "Enter") login();
-});
+window.location="admin.html";
+
+}else{
+
+window.location="board.html";
+
+}
+
+}
+
 </script>
+
 </body>
 </html>

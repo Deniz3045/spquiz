@@ -1,107 +1,121 @@
 <!DOCTYPE html>
-<html>
+<html lang="de">
 <head>
 <meta charset="UTF-8">
 <title>Admin Panel</title>
-<style>
-body{font-family:Arial;background:#1a1a1a;color:white;margin:0;padding:0;}
-.container{padding:20px;}
-.card{background:#222;margin:10px;padding:20px;border-radius:10px;}
-input, select{padding:8px;margin:5px;}
-button{padding:8px;background:#00c6ff;border:none;color:white;margin:5px;cursor:pointer;border-radius:5px;}
-h2{margin-top:0;}
-</style>
+<link rel="stylesheet" href="admin.css">
 </head>
 <body>
 <div class="container">
-<h1>Admin Panel</h1>
+    <h1>Admin Panel</h1>
 
-<div class="card">
-<h2>Spieler verwalten</h2>
-<div id="userList"></div>
-<input id="username" placeholder="Username">
-<input id="password" placeholder="Password">
-<select id="role">
-<option value="player">Player</option>
-<option value="editor">Editor</option>
-<option value="admin">Admin</option>
-</select>
-<button onclick="addUser()">Erstellen</button>
-</div>
+    <!-- Spielerverwaltung -->
+    <div class="card">
+        <h2>Spieler verwalten</h2>
+        <div id="userList">Lade Spieler...</div>
+        <input id="username" placeholder="Username">
+        <input id="password" placeholder="Password">
+        <select id="role">
+            <option value="player">Player</option>
+            <option value="editor">Editor</option>
+            <option value="admin">Admin</option>
+        </select>
+        <button onclick="addUser()">Erstellen</button>
+    </div>
 
-<div class="card">
-<h2>Board Archiv</h2>
-<div id="boardList"></div>
-<input id="newBoardFile" placeholder="Board Datei Name">
-<button onclick="createBoard()">Erstellen</button>
-</div>
+    <!-- Board Verwaltung -->
+    <div class="card">
+        <h2>Board Archiv</h2>
+        <div id="boardList">Lade Boards...</div>
+        <input id="newBoardFile" placeholder="Board Datei Name">
+        <button onclick="createBoard()">Erstellen</button>
+    </div>
 </div>
 
 <script>
-async function loadUsers(){
-  const res = await fetch("/api/users");
-  const users = await res.json();
-  userList.innerHTML = "";
-  users.forEach(u=>{
-    const div = document.createElement("div");
-    div.innerHTML = `${u.username} (${u.role}) 
-      <button onclick="deleteUser('${u.username}')">Löschen</button>`;
-    userList.appendChild(div);
-  });
+async function fetchJSON(url, options) {
+    const res = await fetch(url, options);
+    return res.json();
 }
 
-async function addUser(){
-  await fetch("/api/users/create",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({
-      username:username.value,
-      password:password.value,
-      role:role.value
-    })
-  });
-  loadUsers();
+// Spieler Liste laden
+async function loadUsers() {
+    const users = await fetchJSON("/api/users");
+    const userListEl = document.getElementById("userList");
+    userListEl.innerHTML = "";
+    users.forEach(u => {
+        const div = document.createElement("div");
+        div.className = "userRow";
+        div.innerHTML = `
+            ${u.username} (${u.role}) 
+            <button onclick="deleteUser('${u.username}')">Löschen</button>
+        `;
+        userListEl.appendChild(div);
+    });
 }
 
-async function deleteUser(name){
-  await fetch("/api/users/delete",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({ username:name })
-  });
-  loadUsers();
+// Spieler erstellen
+async function addUser() {
+    const username = document.getElementById("username").value;
+    const password = document.getElementById("password").value;
+    const role = document.getElementById("role").value;
+
+    await fetchJSON("/api/users/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password, role })
+    });
+    loadUsers();
 }
 
-async function loadBoards(){
-  const res = await fetch("/api/boards/files");
-  const boards = await res.json();
-  boardList.innerHTML="";
-  boards.forEach(b=>{
-    const div = document.createElement("div");
-    div.innerHTML = `${b.file} erstellt von ${b.createdBy} 
-      <button onclick="startGame('${b.file}')">Start</button>`;
-    boardList.appendChild(div);
-  });
+// Spieler löschen
+async function deleteUser(username) {
+    await fetchJSON("/api/users/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username })
+    });
+    loadUsers();
 }
 
-async function createBoard(){
-  await fetch("/api/boards/create",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({ fileName:newBoardFile.value })
-  });
-  loadBoards();
+// Boards laden
+async function loadBoards() {
+    const boards = await fetchJSON("/api/boards/files");
+    const boardListEl = document.getElementById("boardList");
+    boardListEl.innerHTML = "";
+    boards.forEach(b => {
+        const div = document.createElement("div");
+        div.className = "boardRow";
+        div.innerHTML = `
+            ${b.file} (erstellt von: ${b.createdBy}) 
+            <button onclick="startGame('${b.file}')">Start Quiz</button>
+        `;
+        boardListEl.appendChild(div);
+    });
 }
 
-async function startGame(file){
-  await fetch("/api/game/start",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({ file })
-  });
-  alert("Quiz gestartet");
+// Neues Board erstellen
+async function createBoard() {
+    const fileName = document.getElementById("newBoardFile").value;
+    await fetchJSON("/api/boards/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileName })
+    });
+    loadBoards();
 }
 
+// Quiz starten
+async function startGame(file) {
+    await fetchJSON("/api/game/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file })
+    });
+    alert("Quiz gestartet!");
+}
+
+// Initial
 loadUsers();
 loadBoards();
 </script>

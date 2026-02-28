@@ -1,297 +1,119 @@
 <!DOCTYPE html>
-<html lang="de">
+<html>
 <head>
-<meta charset="UTF-8">
 <title>Admin Panel</title>
-<script src="/socket.io/socket.io.js"></script>
-<link rel="stylesheet" href="admin.css">
 </head>
 <body>
 
 <h1>Admin Panel</h1>
 
-<div class="container">
+<h2>Benutzer</h2>
 
-<!-- USER MANAGEMENT -->
+<div id="users"></div>
 
-<div class="panel">
-
-<h2>User erstellen</h2>
-
-<input id="username" placeholder="Username">
-<input id="password" placeholder="Password">
-
+<input id="username">
+<input id="password">
 <select id="role">
-<option value="player">Player</option>
-<option value="editor">Editor</option>
-<option value="admin">Admin</option>
+<option>player</option>
+<option>editor</option>
+<option>admin</option>
 </select>
 
-<button onclick="createUser()">Erstellen</button>
+<button onclick="createUser()">User erstellen</button>
 
-<h3>User Liste</h3>
+<hr>
 
-<div id="userList"></div>
+<h2>Board Dateien</h2>
 
-</div>
+<div id="boards"></div>
 
-
-<!-- BOARD EDITOR -->
-
-<div class="panel">
-
-<h2>Board Editor</h2>
-
-<label>Board Name:</label>
-<input id="boardName">
-
-<label>Multiplikator:</label>
-<input id="multiplier" type="number" value="1">
-
-<button onclick="addCategory()">Kategorie hinzufügen</button>
-
-<button onclick="saveBoard()">Board speichern</button>
-
-<div id="categories"></div>
-
-</div>
-
-</div>
+<input id="newBoardFile">
+<button onclick="createBoardFile()">Neue Datei</button>
 
 <script>
 
-const socket = io();
-
-let board = {
-
-multiplier: 1,
-
-categories: []
-
-};
-
-
-// LOAD USERS
-
 async function loadUsers(){
 
-const res = await fetch("/admin/users");
-
+const res = await fetch("/api/users");
 const users = await res.json();
 
-const list = document.getElementById("userList");
-
-list.innerHTML = "";
-
-users.forEach(u=>{
-
-const div = document.createElement("div");
-
-div.innerText = u.username + " ("+u.role+") Score:"+u.score;
-
-list.appendChild(div);
-
-});
-
+document.getElementById("users").innerHTML =
+users.map(u=>u.username+" ("+u.role+")").join("<br>");
 }
-
-
-// CREATE USER
 
 async function createUser(){
 
-const username = document.getElementById("username").value;
-
-const password = document.getElementById("password").value;
-
-const role = document.getElementById("role").value;
-
-await fetch("/admin/addUser",{
+await fetch("/api/users/create",{
 
 method:"POST",
+headers:{"Content-Type":"application/json"},
 
-headers:{ "Content-Type":"application/json" },
+body:JSON.stringify({
 
-body:JSON.stringify({username,password,role})
+username:username.value,
+password:password.value,
+role:role.value
 
+})
 });
 
 loadUsers();
-
 }
 
+async function loadBoards(){
 
-// LOAD BOARD
+const res = await fetch("/api/boards/files");
+const boards = await res.json();
 
-async function loadBoard(){
+document.getElementById("boards").innerHTML =
 
-const res = await fetch("/admin/boards");
+boards.map(b=>
 
-board = await res.json();
+b.file+
+" erstellt von "+b.createdBy+
 
-document.getElementById("boardName").value = board.name || "";
+` <button onclick="start('${b.file}')">
+Start
+</button>`
 
-document.getElementById("multiplier").value = board.multiplier;
-
-renderCategories();
-
+).join("<br>");
 }
 
+async function createBoardFile(){
 
-// SAVE BOARD
-
-async function saveBoard(){
-
-board.name = document.getElementById("boardName").value;
-
-board.multiplier = parseInt(document.getElementById("multiplier").value);
-
-await fetch("/admin/saveBoard",{
+await fetch("/api/boards/file/create",{
 
 method:"POST",
 
-headers:{ "Content-Type":"application/json" },
+headers:{"Content-Type":"application/json"},
 
-body:JSON.stringify(board)
+body:JSON.stringify({
 
+file:newBoardFile.value
+
+})
 });
 
-alert("Board gespeichert");
-
+loadBoards();
 }
 
+async function start(file){
 
-// CATEGORY
+await fetch("/api/game/start",{
 
-function addCategory(){
+method:"POST",
 
-board.categories.push({
+headers:{"Content-Type":"application/json"},
 
-name:"Neue Kategorie",
-
-questions:[]
+body:JSON.stringify({file})
 
 });
 
-renderCategories();
-
+window.open("/quiz.html");
 }
-
-
-// QUESTION
-
-function addQuestion(catIndex){
-
-board.categories[catIndex].questions.push({
-
-text:"Neue Frage",
-
-answer:"Antwort",
-
-value:100,
-
-timer:30
-
-});
-
-renderCategories();
-
-}
-
-
-// RENDER
-
-function renderCategories(){
-
-const container = document.getElementById("categories");
-
-container.innerHTML="";
-
-board.categories.forEach((cat,ci)=>{
-
-const div = document.createElement("div");
-
-div.className="category";
-
-const title = document.createElement("input");
-
-title.value = cat.name;
-
-title.oninput = ()=>{
-
-cat.name = title.value;
-
-};
-
-div.appendChild(title);
-
-const addQ = document.createElement("button");
-
-addQ.innerText="Frage hinzufügen";
-
-addQ.onclick=()=>addQuestion(ci);
-
-div.appendChild(addQ);
-
-
-cat.questions.forEach((q,qi)=>{
-
-const qDiv = document.createElement("div");
-
-qDiv.className="question";
-
-const text = document.createElement("input");
-
-text.value=q.text;
-
-text.oninput=()=>q.text=text.value;
-
-const answer = document.createElement("input");
-
-answer.value=q.answer;
-
-answer.oninput=()=>q.answer=answer.value;
-
-const value = document.createElement("input");
-
-value.type="number";
-
-value.value=q.value;
-
-value.oninput=()=>q.value=parseInt(value.value);
-
-const timer = document.createElement("input");
-
-timer.type="number";
-
-timer.value=q.timer;
-
-timer.oninput=()=>q.timer=parseInt(timer.value);
-
-qDiv.appendChild(text);
-
-qDiv.appendChild(answer);
-
-qDiv.appendChild(value);
-
-qDiv.appendChild(timer);
-
-div.appendChild(qDiv);
-
-});
-
-container.appendChild(div);
-
-});
-
-}
-
-
-// INIT
 
 loadUsers();
-
-loadBoard();
+loadBoards();
 
 </script>
 

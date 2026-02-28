@@ -2,186 +2,351 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Board Editor</title>
-<link rel="stylesheet" href="css/editor.css">
+<title>Jeopardy Board Editor</title>
+
+<style>
+
+body{
+background:#0b0f1a;
+color:white;
+font-family:Arial;
+text-align:center;
+}
+
+h1{
+margin-bottom:10px;
+}
+
+.topbar{
+margin-bottom:20px;
+}
+
+input, select, button{
+padding:8px;
+margin:5px;
+border-radius:5px;
+border:none;
+}
+
+button{
+background:#2563eb;
+color:white;
+cursor:pointer;
+}
+
+button:hover{
+background:#1d4ed8;
+}
+
+.board{
+display:grid;
+grid-template-columns:repeat(5,1fr);
+gap:5px;
+max-width:900px;
+margin:auto;
+}
+
+.category{
+background:#111827;
+padding:10px;
+font-weight:bold;
+}
+
+.cell{
+background:#1e3a8a;
+padding:20px;
+cursor:pointer;
+font-size:20px;
+}
+
+.cell:hover{
+background:#2563eb;
+}
+
+.modal{
+position:fixed;
+top:50%;
+left:50%;
+transform:translate(-50%,-50%);
+background:#111827;
+padding:20px;
+display:none;
+z-index:10;
+}
+
+.modal input{
+width:100%;
+margin-bottom:10px;
+}
+
+.overlay{
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:rgba(0,0,0,0.6);
+display:none;
+}
+
+</style>
+
 </head>
 <body>
 
-<h1>Board Editor</h1>
+
+<h1>Jeopardy Board Editor</h1>
 
 
-<div>
+<div class="topbar">
 
 Board Name:
-
 <input id="boardName">
 
 Multiplikator:
-
 <input id="multiplier" type="number" value="1">
 
-<button onclick="createBoard()">Neues Board</button>
-
+<button onclick="newBoard()">Neues Board</button>
 <button onclick="saveBoard()">Speichern</button>
+<button onclick="loadBoards()">Boards laden</button>
+
+<select id="boardsList" onchange="loadBoard(this.value)"></select>
 
 </div>
 
 
-<hr>
+<div id="board" class="board"></div>
 
 
-<div id="categories"></div>
+<div class="overlay" id="overlay"></div>
 
 
-<button onclick="addCategory()">Kategorie hinzufügen</button>
+<div class="modal" id="modal">
+
+<h3>Frage bearbeiten</h3>
+
+Frage:
+<input id="editQuestion">
+
+Antwort:
+<input id="editAnswer">
+
+Timer:
+<input id="editTimer" type="number">
+
+<button onclick="saveQuestion()">Speichern</button>
+<button onclick="closeModal()">Abbrechen</button>
+
+</div>
+
 
 
 <script>
 
-let board = {
-
+let board={
 name:"",
-
 multiplier:1,
-
 categories:[]
-
 };
+
+let editCat=null;
+let editQ=null;
 
 
 // BOARD ERSTELLEN
-function createBoard(){
+function newBoard(){
 
-board.name=document.getElementById("boardName").value;
+board={
+name:"Neues Board",
+multiplier:1,
+categories:[]
+};
 
-board.multiplier=Number(document.getElementById("multiplier").value);
+for(let c=0;c<5;c++){
 
-board.categories=[];
-
-render();
-
-}
-
-
-// CATEGORY HINZUFÜGEN
-function addCategory(){
-
-board.categories.push({
-
-name:"Neue Kategorie",
-
+let cat={
+name:"Kategorie "+(c+1),
 questions:[]
+};
 
-});
+for(let r=0;r<5;r++){
 
-render();
+cat.questions.push({
 
-}
-
-
-// QUESTION HINZUFÜGEN
-function addQuestion(catIndex){
-
-board.categories[catIndex].questions.push({
-
-question:"Neue Frage",
-
-answer:"Antwort",
-
-value:100,
-
+question:"",
+answer:"",
+value:(r+1)*100,
 timer:30
 
 });
 
+}
+
+board.categories.push(cat);
+
+}
+
 render();
 
 }
 
 
-// RENDER
+// RENDER BOARD
 function render(){
 
-const div=document.getElementById("categories");
+document.getElementById("boardName").value=board.name;
+document.getElementById("multiplier").value=board.multiplier;
 
+const div=document.getElementById("board");
 div.innerHTML="";
 
-board.categories.forEach((cat,ci)=>{
 
-let html=`
+// Kategorien
+board.categories.forEach((cat,c)=>{
 
-<h2>
+const el=document.createElement("div");
 
+el.className="category";
+
+el.innerHTML=`
 <input value="${cat.name}"
-onchange="board.categories[${ci}].name=this.value">
-
-<button onclick="addQuestion(${ci})">Frage hinzufügen</button>
-
-</h2>
-
+onchange="board.categories[${c}].name=this.value">
 `;
 
-cat.questions.forEach((q,qi)=>{
-
-html+=`
-
-<div class="question">
-
-Frage:
-
-<input value="${q.question}"
-onchange="board.categories[${ci}].questions[${qi}].question=this.value">
-
-Antwort:
-
-<input value="${q.answer}"
-onchange="board.categories[${ci}].questions[${qi}].answer=this.value">
-
-Wert:
-
-<input type="number" value="${q.value}"
-onchange="board.categories[${ci}].questions[${qi}].value=Number(this.value)">
-
-Timer:
-
-<input type="number" value="${q.timer}"
-onchange="board.categories[${ci}].questions[${qi}].timer=Number(this.value)">
-
-</div>
-
-`;
+div.appendChild(el);
 
 });
 
-div.innerHTML+=html;
 
-});
+// Fragen
+for(let r=0;r<5;r++){
+
+for(let c=0;c<5;c++){
+
+const q=board.categories[c].questions[r];
+
+const el=document.createElement("div");
+
+el.className="cell";
+
+el.innerHTML=q.value*board.multiplier;
+
+el.onclick=()=>openEditor(c,r);
+
+div.appendChild(el);
+
+}
+
+}
 
 }
 
 
-// SPEICHERN
+// OPEN EDITOR
+function openEditor(c,r){
+
+editCat=c;
+editQ=r;
+
+const q=board.categories[c].questions[r];
+
+document.getElementById("editQuestion").value=q.question;
+document.getElementById("editAnswer").value=q.answer;
+document.getElementById("editTimer").value=q.timer;
+
+document.getElementById("modal").style.display="block";
+document.getElementById("overlay").style.display="block";
+
+}
+
+
+// SAVE QUESTION
+function saveQuestion(){
+
+board.categories[editCat].questions[editQ].question=
+document.getElementById("editQuestion").value;
+
+board.categories[editCat].questions[editQ].answer=
+document.getElementById("editAnswer").value;
+
+board.categories[editCat].questions[editQ].timer=
+Number(document.getElementById("editTimer").value);
+
+closeModal();
+
+}
+
+
+// CLOSE
+function closeModal(){
+
+document.getElementById("modal").style.display="none";
+document.getElementById("overlay").style.display="none";
+
+}
+
+
+// SAVE BOARD
 async function saveBoard(){
 
 board.name=document.getElementById("boardName").value;
-
 board.multiplier=Number(document.getElementById("multiplier").value);
 
 await fetch("/api/boards/save",{
 
 method:"POST",
-
 headers:{"Content-Type":"application/json"},
-
 body:JSON.stringify(board)
 
 });
 
 alert("Board gespeichert");
 
+loadBoards();
+
 }
 
+
+// LOAD BOARDS LIST
+async function loadBoards(){
+
+const res=await fetch("/api/boards");
+
+const boards=await res.json();
+
+const select=document.getElementById("boardsList");
+
+select.innerHTML="";
+
+Object.keys(boards).forEach(name=>{
+
+select.innerHTML+=`<option>${name}</option>`;
+
+});
+
+}
+
+
+// LOAD BOARD
+async function loadBoard(name){
+
+const res=await fetch("/api/boards");
+
+const boards=await res.json();
+
+board=boards[name];
+
+render();
+
+}
+
+
+// INIT
+newBoard();
+loadBoards();
+
 </script>
+
 
 </body>
 </html>

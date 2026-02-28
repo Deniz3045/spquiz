@@ -1,7 +1,7 @@
 {
   "name": "spquiz",
   "version": "1.0.0",
-  "description": "Multiplayer Jeopardy Quiz System mit Admin und Live Sync",
+  "description": "Multiplayer Jeopardy Quiz mit Admin Panel und Live Sync",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -10,16 +10,13 @@
   "author": "Deniz",
   "license": "MIT",
   "dependencies": {
+    "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-session": "^1.17.3",
-    "socket.io": "^4.7.5",
-    "dotenv": "^16.4.5",
-    "@octokit/rest": "^20.0.2"
+    "session-file-store": "^1.5.0",
+    "socket.io": "^4.7.5"
   },
   "devDependencies": {
     "nodemon": "^3.0.3"
-  },
-  "engines": {
-    "node": ">=18.0.0"
   }
 }

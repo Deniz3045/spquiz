@@ -1,188 +1,105 @@
-require("dotenv").config();
-
-const express = require("express");
-const fs = require("fs");
-const path = require("path");
-const http = require("http");
-const session = require("express-session");
-const FileStore = require("session-file-store")(session);
-const { Server } = require("socket.io");
+const express = require('express');
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
+const socketio = require('socket.io');
+require('dotenv').config();
 const { Octokit } = require("@octokit/rest");
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = socketio(server);
 
-const PORT = 3000;
-
-/* GitHub Config */
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
-const OWNER = process.env.GITHUB_OWNER;
-const REPO = process.env.GITHUB_REPO;
+const owner = "Deniz3045"; // GitHub User
+const repo = "spquiz";             // Repo Name
 
-/* Local paths */
-const DATA_DIR = "./data";
-const BOARDS_DIR = path.join(DATA_DIR, "boards");
-const USERS_FILE = path.join(DATA_DIR, "users.json");
-const ACTIVE_FILE = path.join(DATA_DIR, "activeGame.json");
-const SESSIONS_DIR = path.join(DATA_DIR, "sessions");
-
-/* ensure folders exist */
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
-if (!fs.existsSync(BOARDS_DIR)) fs.mkdirSync(BOARDS_DIR, { recursive: true });
-if (!fs.existsSync(SESSIONS_DIR)) fs.mkdirSync(SESSIONS_DIR);
-
-/* Middleware */
+app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
-app.use(express.static("public"));
 
-app.use(session({
-    store: new FileStore({ path: SESSIONS_DIR }),
-    secret: "quiz-secret",
-    resave: false,
-    saveUninitialized: false,
-    cookie: { maxAge: 86400000 }
-}));
+let users = JSON.parse(fs.readFileSync('./data/users.json'));
+let currentGame = { activePlayer: null, currentQuestion: null, timer: 0 };
 
-/* --- GitHub helpers --- */
-async function githubRead(filePath, defaultData = {}) {
-    try {
-        const res = await octokit.repos.getContent({
-            owner: OWNER,
-            repo: REPO,
-            path: filePath
+// --- API: Login ---
+app.post("/api/login", (req,res)=>{
+    const {username,password} = req.body;
+    const user = users.find(u=>u.username===username && u.password===password);
+    if(user) res.json({success:true, role:user.role, username:user.username});
+    else res.json({success:false});
+});
+
+// --- API: Users ---
+app.get("/api/users",(req,res)=>{ res.json(users); });
+
+app.post("/api/users/create",(req,res)=>{
+    const { username, password, role } = req.body;
+    users.push({username,password,role,score:0});
+    fs.writeFileSync('./data/users.json',JSON.stringify(users,null,2));
+    res.json({success:true});
+});
+
+app.post("/api/users/delete",(req,res)=>{
+    const { username } = req.body;
+    users = users.filter(u=>u.username!==username);
+    fs.writeFileSync('./data/users.json',JSON.stringify(users,null,2));
+    res.json({success:true});
+});
+
+// --- API: Boards auflisten ---
+app.get("/api/boards/files", async (req,res)=>{
+    try{
+        const ghFiles = await octokit.repos.getContent({owner,repo,path:"data/boards"});
+        const boards = ghFiles.data.map(f=>({file:f.name, createdBy:"-" }));
+        res.json(boards);
+    }catch(e){ console.error(e); res.status(500).json({error:"GitHub Fehler"}); }
+});
+
+// --- API: Board erstellen ---
+app.post("/api/boards/create", async (req,res)=>{
+    const { fileName } = req.body;
+    const content = Buffer.from(JSON.stringify({ categories:[], multiplier:1 }, null,2)).toString('base64');
+    try{
+        await octokit.repos.createOrUpdateFileContents({
+            owner, repo, path:`data/boards/${fileName}.json`,
+            message:`Board ${fileName} erstellt`,
+            content,
+            branch:"main"
         });
-        const content = Buffer.from(res.data.content, "base64").toString();
-        return JSON.parse(content);
-    } catch {
-        await githubWrite(filePath, defaultData);
-        return defaultData;
-    }
-}
+        res.json({success:true});
+    }catch(e){ console.error(e); res.status(500).json({error:"GitHub Fehler"}); }
+});
 
-async function githubWrite(filePath, data) {
-    let sha;
-    try {
-        const res = await octokit.repos.getContent({
-            owner: OWNER,
-            repo: REPO,
-            path: filePath
+// --- API: Board speichern (Editor) ---
+app.post("/api/boards/save", async (req,res)=>{
+    const { fileName, boardData } = req.body;
+    const content = Buffer.from(JSON.stringify(boardData,null,2)).toString('base64');
+    try{
+        await octokit.repos.createOrUpdateFileContents({
+            owner, repo, path:`data/boards/${fileName}`,
+            message:`Board ${fileName} gespeichert`,
+            content,
+            branch:"main"
         });
-        sha = res.data.sha;
-    } catch {}
-    await octokit.repos.createOrUpdateFileContents({
-        owner: OWNER,
-        repo: REPO,
-        path: filePath,
-        message: "update " + filePath,
-        content: Buffer.from(JSON.stringify(data, null, 2)).toString("base64"),
-        sha
+        res.json({success:true});
+    }catch(e){ console.error(e); res.status(500).json({error:"GitHub Fehler"}); }
+});
+
+// --- Socket.IO ---
+io.on('connection', socket=>{
+    socket.on('getBoard', ()=>{ /* Admin/Spieler Board laden via GitHub */ });
+    socket.on('selectQuestion', ({categoryIndex,questionIndex,admin})=>{
+        io.emit('questionSelected', {question:"Beispiel Frage", answer:"Antwort", value:100, timer:30});
     });
-}
-
-/* --- Users --- */
-async function readUsers() {
-    return await githubRead("data/users.json", [{
-        username: "admin",
-        password: "admin",
-        role: "admin",
-        score: 0
-    }]);
-}
-
-async function saveUsers(users) {
-    await githubWrite("data/users.json", users);
-}
-
-/* --- Boards --- */
-function getLocalBoards() {
-    return fs.readdirSync(BOARDS_DIR).filter(f => f.endsWith(".json"));
-}
-
-function loadBoardFile(file) {
-    return JSON.parse(fs.readFileSync(path.join(BOARDS_DIR, file)));
-}
-
-function saveBoardFile(file, data) {
-    fs.writeFileSync(path.join(BOARDS_DIR, file), JSON.stringify(data, null, 2));
-}
-
-/* --- Auth --- */
-app.post("/api/login", async (req, res) => {
-    const users = await readUsers();
-    const user = users.find(u => u.username === req.body.username && u.password === req.body.password);
-    if (!user) return res.json({ success: false });
-    req.session.user = user;
-    res.json({ success: true, username: user.username, role: user.role });
-});
-
-app.get("/api/me", (req, res) => res.json(req.session.user || null));
-
-/* --- Admin: Spieler Management --- */
-app.get("/api/users", async (req, res) => {
-    if (!req.session.user || req.session.user.role !== "admin") return res.status(403).end();
-    const users = await readUsers();
-    res.json(users);
-});
-
-app.post("/api/users/create", async (req, res) => {
-    if (!req.session.user || req.session.user.role !== "admin") return res.status(403).end();
-    const users = await readUsers();
-    users.push({
-        username: req.body.username,
-        password: req.body.password,
-        role: req.body.role,
-        createdBy: req.session.user.username,
-        score: 0
+    socket.on('startTimer', ()=>{
+        let timer = 30;
+        const interval = setInterval(()=>{
+            if(timer<=0){ clearInterval(interval); io.emit('timerEnded'); }
+            else { timer--; io.emit('timerUpdate',timer); }
+        },1000);
     });
-    await saveUsers(users);
-    res.json({ success: true });
-});
-
-app.post("/api/users/delete", async (req, res) => {
-    if (!req.session.user || req.session.user.role !== "admin") return res.status(403).end();
-    let users = await readUsers();
-    users = users.filter(u => u.username !== req.body.username);
-    await saveUsers(users);
-    res.json({ success: true });
-});
-
-/* --- Boards --- */
-app.get("/api/boards/files", (req, res) => {
-    const boards = getLocalBoards().map(file => {
-        const data = loadBoardFile(file);
-        return { file, createdBy: data.createdBy, boardCount: data.boards.length };
-    });
-    res.json(boards);
-});
-
-app.post("/api/boards/create", (req, res) => {
-    const file = req.body.fileName.endsWith(".json") ? req.body.fileName : req.body.fileName + ".json";
-    saveBoardFile(file, { createdBy: req.session.user.username, boards: [] });
-    res.json({ success: true });
-});
-
-/* --- Start Quiz --- */
-app.post("/api/game/start", (req, res) => {
-    fs.writeFileSync(ACTIVE_FILE, JSON.stringify({ file: req.body.file }));
-    io.emit("gameStarted", req.body.file);
-    res.json({ success: true });
-});
-
-app.get("/api/game", (req, res) => {
-    if (!fs.existsSync(ACTIVE_FILE)) return res.json(null);
-    res.json(JSON.parse(fs.readFileSync(ACTIVE_FILE)));
-});
-
-/* --- Socket.IO --- */
-io.on("connection", socket => {
-    socket.on("getBoard", () => {
-        if (!fs.existsSync(ACTIVE_FILE)) return;
-        const active = JSON.parse(fs.readFileSync(ACTIVE_FILE));
-        const board = loadBoardFile(active.file);
-        socket.emit("boardData", board);
+    socket.on('buzz', player=>{
+        io.emit('buzzUpdate', player);
     });
 });
 
-/* --- Server starten --- */
-server.listen(PORT, () => console.log(`Server läuft auf http://localhost:${PORT}`));
+server.listen(3000, ()=>console.log("Server läuft auf http://localhost:3000"));

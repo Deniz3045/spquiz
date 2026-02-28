@@ -28,21 +28,113 @@ app.post("/api/login", (req,res)=>{
     else res.json({success:false});
 });
 
-// --- API: Users ---
-app.get("/api/users",(req,res)=>{ res.json(users); });
+/* ===============================
+   USERS API (FULL CRUD WITH GITHUB)
+================================ */
 
-app.post("/api/users/create",(req,res)=>{
-    const { username, password, role } = req.body;
-    users.push({username,password,role,score:0});
-    fs.writeFileSync('./data/users.json',JSON.stringify(users,null,2));
-    res.json({success:true});
+// Alle User laden
+app.get("/api/users", async (req, res) => {
+
+    users = await githubRead("data/users.json") || [];
+
+    res.json(users);
+
 });
 
-app.post("/api/users/delete",(req,res)=>{
+
+// User erstellen
+app.post("/api/users/create", async (req, res) => {
+
+    const sessionUser = req.session.user;
+
+    if (!sessionUser || sessionUser.role !== "admin")
+        return res.status(403).json({ error: "Keine Berechtigung" });
+
+    const { username, password, role } = req.body;
+
+    if (!username || !password || !role)
+        return res.status(400).json({ error: "Fehlende Daten" });
+
+    users = await githubRead("data/users.json") || [];
+
+    if (users.find(u => u.username === username))
+        return res.status(400).json({ error: "User existiert bereits" });
+
+    const newUser = {
+
+        username,
+        password,
+        role,
+        score: 0
+
+    };
+
+    users.push(newUser);
+
+    await githubWrite("data/users.json", users);
+
+    io.emit("usersUpdated", users);
+
+    res.json({ success: true });
+
+});
+
+
+// User bearbeiten
+app.post("/api/users/update", async (req, res) => {
+
+    const sessionUser = req.session.user;
+
+    if (!sessionUser || sessionUser.role !== "admin")
+        return res.status(403).json({ error: "Keine Berechtigung" });
+
+    const { username, password, role, score } = req.body;
+
+    users = await githubRead("data/users.json") || [];
+
+    const user = users.find(u => u.username === username);
+
+    if (!user)
+        return res.status(404).json({ error: "User nicht gefunden" });
+
+    if (password !== undefined)
+        user.password = password;
+
+    if (role !== undefined)
+        user.role = role;
+
+    if (score !== undefined)
+        user.score = score;
+
+    await githubWrite("data/users.json", users);
+
+    io.emit("usersUpdated", users);
+
+    res.json({ success: true });
+
+});
+
+
+// User löschen
+app.post("/api/users/delete", async (req, res) => {
+
+    const sessionUser = req.session.user;
+
+    if (!sessionUser || sessionUser.role !== "admin")
+        return res.status(403).json({ error: "Keine Berechtigung" });
+
     const { username } = req.body;
-    users = users.filter(u=>u.username!==username);
-    fs.writeFileSync('./data/users.json',JSON.stringify(users,null,2));
-    res.json({success:true});
+
+    users = await githubRead("data/users.json") || [];
+
+    users = users.filter(u => u.username !== username);
+
+    await githubWrite("data/users.json", users);
+
+    io.emit("usersUpdated", users);
+
+    res.json({ success: true });
+
 });
 
 // --- API: Boards auflisten ---

@@ -1,118 +1,146 @@
 <!DOCTYPE html>
 <html>
 <head>
+<meta charset="UTF-8">
 <title>Admin Panel</title>
+
+<style>
+
+body{
+font-family:Arial;
+background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+color:white;
+margin:0;
+}
+
+.container{
+padding:20px;
+}
+
+.card{
+background:rgba(255,255,255,0.05);
+padding:20px;
+margin:10px;
+border-radius:10px;
+}
+
+button{
+background:#00c6ff;
+border:none;
+padding:10px;
+color:white;
+cursor:pointer;
+margin:5px;
+}
+
+input{
+padding:10px;
+margin:5px;
+}
+
+</style>
 </head>
 <body>
 
+<div class="container">
+
 <h1>Admin Panel</h1>
 
-<h2>Benutzer</h2>
+<div class="card">
 
-<div id="users"></div>
+<h2>User erstellen</h2>
 
-<input id="username">
-<input id="password">
+<input id="user" placeholder="Username">
+<input id="pass" placeholder="Password">
+
 <select id="role">
-<option>player</option>
-<option>editor</option>
-<option>admin</option>
+<option value="player">Player</option>
+<option value="admin">Admin</option>
 </select>
 
-<button onclick="createUser()">User erstellen</button>
+<button onclick="addUser()">Erstellen</button>
 
-<hr>
+</div>
 
-<h2>Board Dateien</h2>
+<div class="card">
+
+<h2>Board Archiv</h2>
 
 <div id="boards"></div>
 
-<input id="newBoardFile">
-<button onclick="createBoardFile()">Neue Datei</button>
+<input id="newBoard" placeholder="Board Datei Name">
+
+<button onclick="createBoard()">Erstellen</button>
+
+</div>
+
+</div>
 
 <script>
 
-async function loadUsers(){
+async function addUser(){
 
-const res = await fetch("/api/users");
-const users = await res.json();
-
-document.getElementById("users").innerHTML =
-users.map(u=>u.username+" ("+u.role+")").join("<br>");
-}
-
-async function createUser(){
-
-await fetch("/api/users/create",{
-
+await fetch("/api/admin/addUser",{
 method:"POST",
 headers:{"Content-Type":"application/json"},
-
 body:JSON.stringify({
-
-username:username.value,
-password:password.value,
+username:user.value,
+password:pass.value,
 role:role.value
-
 })
 });
 
-loadUsers();
+alert("User erstellt");
 }
 
 async function loadBoards(){
 
-const res = await fetch("/api/boards/files");
-const boards = await res.json();
+const res=await fetch("/api/boards/files");
 
-document.getElementById("boards").innerHTML =
+const files=await res.json();
 
-boards.map(b=>
+boards.innerHTML="";
 
-b.file+
-" erstellt von "+b.createdBy+
+files.forEach(f=>{
 
-` <button onclick="start('${b.file}')">
-Start
-</button>`
+boards.innerHTML+=`
+<div>
+${f.file}
+<button onclick="startGame('${f.file}')">Start</button>
+</div>
+`;
 
-).join("<br>");
+});
+
 }
 
-async function createBoardFile(){
+async function createBoard(){
 
-await fetch("/api/boards/file/create",{
-
+await fetch("/api/boards/create",{
 method:"POST",
-
 headers:{"Content-Type":"application/json"},
-
 body:JSON.stringify({
-
-file:newBoardFile.value
-
+fileName:newBoard.value
 })
 });
 
 loadBoards();
 }
 
-async function start(file){
+async function startGame(file){
 
 await fetch("/api/game/start",{
-
 method:"POST",
-
 headers:{"Content-Type":"application/json"},
-
-body:JSON.stringify({file})
-
+body:JSON.stringify({
+file
+})
 });
 
-window.open("/quiz.html");
+alert("Quiz gestartet");
+
 }
 
-loadUsers();
 loadBoards();
 
 </script>

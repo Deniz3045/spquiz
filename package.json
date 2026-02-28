@@ -1,29 +1,30 @@
 {
   "name": "jeopardy-quiz-system",
   "version": "1.0.0",
-  "description": "Jeopardy Quiz System mit Admin Panel, Quiz Master, Board Editor und GitHub Speicherung",
+  "description": "Jeopardy Quiz System with Admin, Players, Board Editor and GitHub Storage",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "start": "node server.js"
   },
-  "keywords": [
-    "quiz",
-    "jeopardy",
-    "gameshow",
-    "express",
-    "github",
-    "json",
-    "admin-panel"
-  ],
-  "author": "",
+  "author": "Deniz",
   "license": "ISC",
   "dependencies": {
-    "@octokit/rest": "^21.0.0",
+
+    "axios": "^1.6.8",
+
+    "bcrypt": "^5.1.0",
+
     "body-parser": "^1.20.2",
+
+    "dotenv": "^16.4.5",
+
     "express": "^4.19.2",
+
     "express-session": "^1.17.3",
-    "fs-extra": "^11.2.0",
+
+    "socket.io": "^4.7.5",
+
     "uuid": "^9.0.1"
+
   }
 }

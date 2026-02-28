@@ -4,5 +4,12 @@
     "password": "admin123",
     "role": "admin",
     "score": 0
+  },
+  {
+    "username": "test",
+    "password": "test",
+    "role": "admin",
+    "createdBy": "admin",
+    "score": 0
   }
 ]

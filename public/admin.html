@@ -20,7 +20,7 @@
             <option value="editor">Editor</option>
             <option value="admin">Admin</option>
         </select>
-        <button onclick="addUser()">Erstellen</button>
+        <button id="createUserBtn">Erstellen</button>
     </div>
 
     <!-- Board Verwaltung -->
@@ -28,7 +28,7 @@
         <h2>Board Archiv</h2>
         <div id="boardList">Lade Boards...</div>
         <input id="newBoardFile" placeholder="Board Datei Name">
-        <button onclick="createBoard()">Erstellen</button>
+        <button id="createBoardBtn">Erstellen</button>
     </div>
 </div>
 
@@ -38,7 +38,7 @@ async function fetchJSON(url, options) {
     return res.json();
 }
 
-// Spieler Liste laden
+// --- Spielerliste ---
 async function loadUsers() {
     const users = await fetchJSON("/api/users");
     const userListEl = document.getElementById("userList");
@@ -47,7 +47,7 @@ async function loadUsers() {
         const div = document.createElement("div");
         div.className = "userRow";
         div.innerHTML = `
-            ${u.username} (${u.role}) 
+            <span>${u.username} (${u.role})</span>
             <button onclick="deleteUser('${u.username}')">Löschen</button>
         `;
         userListEl.appendChild(div);
@@ -60,16 +60,24 @@ async function addUser() {
     const password = document.getElementById("password").value;
     const role = document.getElementById("role").value;
 
+    if (!username || !password) {
+        alert("Bitte Username und Passwort eingeben!");
+        return;
+    }
+
     await fetchJSON("/api/users/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password, role })
     });
+    document.getElementById("username").value = "";
+    document.getElementById("password").value = "";
     loadUsers();
 }
 
 // Spieler löschen
 async function deleteUser(username) {
+    if (!confirm(`Spieler ${username} wirklich löschen?`)) return;
     await fetchJSON("/api/users/delete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -78,7 +86,7 @@ async function deleteUser(username) {
     loadUsers();
 }
 
-// Boards laden
+// --- Boards ---
 async function loadBoards() {
     const boards = await fetchJSON("/api/boards/files");
     const boardListEl = document.getElementById("boardList");
@@ -87,8 +95,8 @@ async function loadBoards() {
         const div = document.createElement("div");
         div.className = "boardRow";
         div.innerHTML = `
-            ${b.file} (erstellt von: ${b.createdBy}) 
-            <button onclick="startGame('${b.file}')">Start Quiz</button>
+            <span>${b.file} (erstellt von: ${b.createdBy})</span>
+            <button onclick="startGame('${b.file}')">Quiz starten</button>
         `;
         boardListEl.appendChild(div);
     });
@@ -97,16 +105,19 @@ async function loadBoards() {
 // Neues Board erstellen
 async function createBoard() {
     const fileName = document.getElementById("newBoardFile").value;
+    if (!fileName) { alert("Bitte Dateinamen eingeben!"); return; }
     await fetchJSON("/api/boards/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ fileName })
     });
+    document.getElementById("newBoardFile").value = "";
     loadBoards();
 }
 
 // Quiz starten
 async function startGame(file) {
+    if (!confirm(`Quiz mit Board ${file} starten?`)) return;
     await fetchJSON("/api/game/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -115,7 +126,11 @@ async function startGame(file) {
     alert("Quiz gestartet!");
 }
 
-// Initial
+// --- Event Listener ---
+document.getElementById("createUserBtn").addEventListener("click", addUser);
+document.getElementById("createBoardBtn").addEventListener("click", createBoard);
+
+// --- Initial ---
 loadUsers();
 loadBoards();
 </script>

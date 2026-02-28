@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Jeopardy Quiz</title>
+<title>Jeopardy Quiz Master</title>
 <link rel="stylesheet" href="quiz.css">
 </head>
 <body>
@@ -18,6 +18,7 @@
     <section class="controls" id="controls">
         <button id="startTimerBtn">Timer starten</button>
         <button id="resetTimerBtn">Timer zurücksetzen</button>
+        <button onclick="window.open('/board-editor.html','_blank','width=1000,height=700')">Board Editor öffnen</button>
     </section>
 </div>
 
@@ -25,16 +26,12 @@
 <script>
 const socket = io();
 let currentQuestion = null;
-let isAdmin = true; // Quiz Master Fenster
-let timerValue = 0;
 
-// --- Board laden ---
+// Board laden
 socket.emit("getBoard");
-socket.on("boardData", board => {
-    renderBoard(board);
-});
+socket.on("boardData", board => renderBoard(board));
 
-// --- Board rendern ---
+// Board rendern
 function renderBoard(board) {
     const boardEl = document.getElementById("board");
     boardEl.innerHTML = "";
@@ -57,40 +54,32 @@ function renderBoard(board) {
     });
 }
 
-// --- Frage auswählen ---
+// Frage auswählen
 function selectQuestion(cIndex, qIndex) {
     socket.emit("selectQuestion", { categoryIndex: cIndex, questionIndex: qIndex, admin: true });
 }
 
-// --- Frage vom Server ---
+// Frage vom Server
 socket.on("questionSelected", q => {
     currentQuestion = q;
-    timerValue = q.timer || 30;
-    document.getElementById("timerDisplay").innerText = "Timer: " + timerValue;
-    alert(`Frage: ${q.question}\nAntwort: ${q.answer}`); // Admin sieht Antwort direkt
+    document.getElementById("timerDisplay").innerText = "Timer: " + q.timer;
+    alert(`Frage: ${q.question}\nAntwort: ${q.answer}`);
 });
 
-// --- Timer ---
+// Timer
 document.getElementById("startTimerBtn").addEventListener("click", () => {
     if(!currentQuestion) return alert("Bitte zuerst eine Frage auswählen!");
     socket.emit("startTimer");
 });
-
 document.getElementById("resetTimerBtn").addEventListener("click", () => {
-    if(currentQuestion) {
-        timerValue = currentQuestion.timer || 30;
-        document.getElementById("timerDisplay").innerText = "Timer: " + timerValue;
-    }
+    if(currentQuestion) document.getElementById("timerDisplay").innerText = "Timer: " + currentQuestion.timer;
 });
 
-socket.on("timerUpdate", t => {
-    timerValue = t;
-    document.getElementById("timerDisplay").innerText = "Timer: " + timerValue;
-});
-
+// Timer Updates
+socket.on("timerUpdate", t => { document.getElementById("timerDisplay").innerText = "Timer: " + t; });
 socket.on("timerEnded", () => alert("Zeit abgelaufen!"));
 
-// --- Buzz Updates ---
+// Buzz Updates
 socket.on("buzzUpdate", player => {
     document.getElementById("currentPlayer").innerText = "Aktiver Spieler: " + player;
 });

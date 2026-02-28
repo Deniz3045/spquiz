@@ -16,11 +16,5 @@
     "password": "test",
     "role": "player",
     "score": 0
-  },
-  {
-    "username": "test1",
-    "password": "test",
-    "role": "admin",
-    "score": 0
   }
 ]

@@ -11,14 +11,14 @@ const server = http.createServer(app);
 const io = socketio(server);
 
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
-const owner = "Deniz3045"; // GitHub User
+const owner = "DEIN_GITHUB_USER"; // GitHub User
 const repo = "spquiz";             // Repo Name
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
 let users = JSON.parse(fs.readFileSync('./data/users.json'));
-let currentGame = { activePlayer: null, currentQuestion: null, timer: 0 };
+let currentGame = { activePlayer: null, currentQuestion: null, timer: 0, board: null };
 
 // --- API: Login ---
 app.post("/api/login", (req,res)=>{
@@ -54,22 +54,7 @@ app.get("/api/boards/files", async (req,res)=>{
     }catch(e){ console.error(e); res.status(500).json({error:"GitHub Fehler"}); }
 });
 
-// --- API: Board erstellen ---
-app.post("/api/boards/create", async (req,res)=>{
-    const { fileName } = req.body;
-    const content = Buffer.from(JSON.stringify({ categories:[], multiplier:1 }, null,2)).toString('base64');
-    try{
-        await octokit.repos.createOrUpdateFileContents({
-            owner, repo, path:`data/boards/${fileName}.json`,
-            message:`Board ${fileName} erstellt`,
-            content,
-            branch:"main"
-        });
-        res.json({success:true});
-    }catch(e){ console.error(e); res.status(500).json({error:"GitHub Fehler"}); }
-});
-
-// --- API: Board speichern (Editor) ---
+// --- API: Board speichern ---
 app.post("/api/boards/save", async (req,res)=>{
     const { fileName, boardData } = req.body;
     const content = Buffer.from(JSON.stringify(boardData,null,2)).toString('base64');
@@ -84,22 +69,61 @@ app.post("/api/boards/save", async (req,res)=>{
     }catch(e){ console.error(e); res.status(500).json({error:"GitHub Fehler"}); }
 });
 
-// --- Socket.IO ---
+// --- Socket.IO Live Sync ---
 io.on('connection', socket=>{
-    socket.on('getBoard', ()=>{ /* Admin/Spieler Board laden via GitHub */ });
-    socket.on('selectQuestion', ({categoryIndex,questionIndex,admin})=>{
-        io.emit('questionSelected', {question:"Beispiel Frage", answer:"Antwort", value:100, timer:30});
+
+    // Spieler/ Admin lädt aktuelles Board
+    socket.on('getBoard', async () => {
+        if(currentGame.board){
+            socket.emit('boardData', currentGame.board);
+        }
     });
+
+    // Admin wählt Frage aus
+    socket.on('selectQuestion', ({categoryIndex,questionIndex,admin})=>{
+        if(!currentGame.board) return;
+        const q = currentGame.board.categories[categoryIndex].questions[questionIndex];
+        currentGame.currentQuestion = q;
+        currentGame.timer = q.timer || 30;
+        currentGame.activePlayer = null;
+        io.emit('questionSelected', q);
+        io.emit('buzzEnabled'); // Spieler können buzzern
+    });
+
+    // Timer starten
     socket.on('startTimer', ()=>{
-        let timer = 30;
+        let timer = currentGame.timer;
         const interval = setInterval(()=>{
             if(timer<=0){ clearInterval(interval); io.emit('timerEnded'); }
             else { timer--; io.emit('timerUpdate',timer); }
         },1000);
     });
-    socket.on('buzz', player=>{
-        io.emit('buzzUpdate', player);
-    });
-});
 
+    // Spieler buzzert
+    socket.on('buzz', (username)=>{
+        if(!currentGame.activePlayer){
+            currentGame.activePlayer = username;
+            io.emit('buzzUpdate', username);
+        }
+    });
+
+    // Antwort abgeben
+    socket.on('answer', ({username,correct})=>{
+        if(!currentGame.currentQuestion) return;
+        const multiplier = currentGame.board?.multiplier || 1;
+        let points = currentGame.currentQuestion.value * multiplier;
+
+        if(username === currentGame.activePlayer){
+            points = correct ? points : -points/2;
+        } else {
+            points = correct ? points/2 : -points/2;
+        }
+
+        const user = users.find(u=>u.username===username);
+        if(user) { user.score += points; fs.writeFileSync('./data/users.json',JSON.stringify(users,null,2)); }
+
+        io.emit('scoreUpdate', users);
+    });
+
+});
 server.listen(3000, ()=>console.log("Server läuft auf http://localhost:3000"));

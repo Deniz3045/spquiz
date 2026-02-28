@@ -2,141 +2,129 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Admin Panel - Jeopardy</title>
+<title>Jeopardy Admin Panel</title>
 <link rel="stylesheet" href="admin.css">
 </head>
 <body>
 <div class="container">
     <header>
-        <h1>Jeopardy Admin Panel</h1>
+        <h1>Admin Panel</h1>
+        <div class="header-buttons">
+            <button onclick="openEditor()">Board Editor öffnen</button>
+            <button onclick="startQuiz()">Quiz starten</button>
+        </div>
     </header>
 
-    <section class="card">
+    <!-- Spielerverwaltung -->
+    <section class="player-management">
         <h2>Spielerverwaltung</h2>
-        <div id="userList" class="list">Lade Spieler...</div>
-        <div class="form-row">
-            <input id="username" placeholder="Username">
-            <input id="password" placeholder="Passwort">
-            <select id="role">
-                <option value="player">Player</option>
-                <option value="editor">Editor</option>
-                <option value="admin">Admin</option>
-            </select>
-            <button id="createUserBtn">Erstellen</button>
-        </div>
+        <input id="newUsername" placeholder="Username">
+        <input id="newPassword" placeholder="Passwort">
+        <select id="newRole">
+            <option value="player">Spieler</option>
+            <option value="editor">Editor</option>
+            <option value="admin">Admin</option>
+        </select>
+        <button id="addPlayerBtn">Hinzufügen</button>
+
+        <table>
+            <thead>
+                <tr><th>Username</th><th>Role</th><th>Punkte</th><th>Aktionen</th></tr>
+            </thead>
+            <tbody id="playersList"></tbody>
+        </table>
     </section>
 
-    <section class="card">
-        <h2>Board Archiv</h2>
-        <div id="boardList" class="list">Lade Boards...</div>
-        <div class="form-row">
-            <input id="newBoardFile" placeholder="Neues Board Name">
-            <button id="createBoardBtn">Erstellen</button>
-        </div>
+    <!-- Board Auswahl -->
+    <section class="board-management">
+        <h2>Boards</h2>
+        <select id="boardSelect"></select>
+        <button onclick="loadBoard()">Board laden</button>
     </section>
 </div>
 
+<script src="/socket.io/socket.io.js"></script>
 <script>
-async function fetchJSON(url, options) {
-    const res = await fetch(url, options);
-    return res.json();
+const socket = io();
+let users = [];
+
+// Spieler laden
+async function loadPlayers(){
+    const res = await fetch("/api/users");
+    users = await res.json();
+    renderPlayers();
 }
 
-// Spielerliste laden
-async function loadUsers() {
-    const users = await fetchJSON("/api/users");
-    const userListEl = document.getElementById("userList");
-    userListEl.innerHTML = "";
-    users.forEach(u => {
-        const div = document.createElement("div");
-        div.className = "row";
-        div.innerHTML = `
-            <span>${u.username} (${u.role})</span>
-            <button onclick="deleteUser('${u.username}')">Löschen</button>
-        `;
-        userListEl.appendChild(div);
+function renderPlayers(){
+    const tbody = document.getElementById("playersList");
+    tbody.innerHTML="";
+    users.forEach(u=>{
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td>${u.username}</td>
+                        <td>${u.role}</td>
+                        <td>${u.score}</td>
+                        <td>
+                            <button onclick="deletePlayer('${u.username}')">Löschen</button>
+                        </td>`;
+        tbody.appendChild(tr);
     });
 }
 
-// Spieler erstellen
-async function addUser() {
-    const username = document.getElementById("username").value.trim();
-    const password = document.getElementById("password").value.trim();
-    const role = document.getElementById("role").value;
-
-    if(!username || !password) { alert("Username und Passwort angeben!"); return; }
-
-    await fetchJSON("/api/users/create", {
-        method:"POST",
-        headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({username,password,role})
-    });
-
-    document.getElementById("username").value="";
-    document.getElementById("password").value="";
-    loadUsers();
+async function deletePlayer(username){
+    await fetch("/api/users/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username})});
+    await loadPlayers();
 }
 
-// Spieler löschen
-async function deleteUser(username) {
-    if(!confirm(`Spieler ${username} wirklich löschen?`)) return;
-    await fetchJSON("/api/users/delete", {
-        method:"POST",
-        headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({username})
-    });
-    loadUsers();
-}
+// Spieler hinzufügen
+document.getElementById("addPlayerBtn").addEventListener("click", async ()=>{
+    const username=document.getElementById("newUsername").value.trim();
+    const password=document.getElementById("newPassword").value.trim();
+    const role=document.getElementById("newRole").value;
+    if(!username||!password) return alert("Username und Passwort angeben!");
+    await fetch("/api/users/create",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username,password,role})});
+    document.getElementById("newUsername").value="";
+    document.getElementById("newPassword").value="";
+    await loadPlayers();
+});
 
 // Boards laden
-async function loadBoards() {
-    const boards = await fetchJSON("/api/boards/files");
-    const boardListEl = document.getElementById("boardList");
-    boardListEl.innerHTML = "";
-    boards.forEach(b => {
-        const div = document.createElement("div");
-        div.className = "row";
-        div.innerHTML = `
-            <span>${b.file} (erstellt von: ${b.createdBy})</span>
-            <button onclick="startGame('${b.file}')">Quiz starten</button>
-        `;
-        boardListEl.appendChild(div);
+async function loadBoards(){
+    const res = await fetch("/api/boards/files");
+    const boards = await res.json();
+    const select = document.getElementById("boardSelect");
+    select.innerHTML="";
+    boards.forEach(b=>{
+        const opt=document.createElement("option");
+        opt.value=b.file;
+        opt.innerText=b.file;
+        select.appendChild(opt);
     });
 }
 
-// Neues Board erstellen
-async function createBoard() {
-    const fileName = document.getElementById("newBoardFile").value.trim();
-    if(!fileName) { alert("Board Name angeben!"); return; }
-    await fetchJSON("/api/boards/create", {
-        method:"POST",
-        headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({fileName})
-    });
-    document.getElementById("newBoardFile").value="";
-    loadBoards();
+// Board Editor öffnen
+function openEditor(){
+    window.open("/board-editor.html","_blank","width=1000,height=700");
 }
 
-// Quiz starten und Quiz Master öffnen
-async function startGame(file) {
-    if(!confirm(`Quiz mit Board ${file} starten?`)) return;
+// Board laden
+function loadBoard(){
+    const file = document.getElementById("boardSelect").value;
+    if(file) socket.emit("loadBoard",{fileName:file});
+}
 
-    await fetchJSON("/api/game/start", {
-        method:"POST",
-        headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({file})
-    });
-
-    // Neues Fenster für Quiz Master
+// Quiz starten
+function startQuiz(){
     window.open("/quiz.html","_blank","width=1200,height=800");
 }
-<button onclick="window.open('/board-editor.html','_blank','width=1000,height=700')">Editor öffnen</button>
-// Event Listener
-document.getElementById("createUserBtn").addEventListener("click", addUser);
-document.getElementById("createBoardBtn").addEventListener("click", createBoard);
 
-// Initial laden
-loadUsers();
+// Live Punkte Update
+socket.on("scoreUpdate", updatedUsers=>{
+    users = updatedUsers;
+    renderPlayers();
+});
+
+// Init
+loadPlayers();
 loadBoards();
 </script>
 </body>

@@ -2,21 +2,21 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Admin Panel</title>
+<title>Quiz Admin Panel</title>
 <link rel="stylesheet" href="css/admin.css">
 </head>
 <body>
 
-<h1>Admin Panel</h1>
+<h1>Quiz Admin Panel</h1>
 
 <div class="section">
 
 <h2>Spieler erstellen</h2>
 
-<input id="newUsername" placeholder="Username">
-<input id="newPassword" placeholder="Password">
+<input id="username" placeholder="Username">
+<input id="password" placeholder="Password">
 
-<select id="newRole">
+<select id="role">
 <option value="player">Player</option>
 <option value="editor">Editor</option>
 <option value="admin">Admin</option>
@@ -26,78 +26,226 @@
 
 </div>
 
+
 <div class="section">
 
 <h2>Spieler Liste</h2>
 
-<div id="usersList"></div>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Role</th>
+<th>Score</th>
+<th>Aktionen</th>
+</tr>
+</thead>
+
+<tbody id="usersTable"></tbody>
+
+</table>
 
 </div>
+
 
 <div class="section">
 
 <h2>Boards</h2>
 
-<button onclick="openEditor()">Board Editor öffnen</button>
+<select id="boardSelect"></select>
 
-<button onclick="openQuiz()">Quiz starten</button>
+<button onclick="selectBoard()">Board aktivieren</button>
+
+<button onclick="openEditor()">Board Editor</button>
+
+<button onclick="startQuiz()">Quiz starten</button>
 
 </div>
+
+
+<script src="/socket.io/socket.io.js"></script>
 
 <script>
 
-async function createUser(){
+const socket = io();
 
-const username=document.getElementById("newUsername").value;
-const password=document.getElementById("newPassword").value;
-const role=document.getElementById("newRole").value;
 
-await fetch("/api/users/create",{
-
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({username,password,role})
-
-});
-
-loadUsers();
-
-}
-
+// USERS LADEN
 async function loadUsers(){
 
 const res = await fetch("/api/users");
+
 const users = await res.json();
 
-const div=document.getElementById("usersList");
+const table = document.getElementById("usersTable");
 
-div.innerHTML="";
+table.innerHTML="";
 
-users.forEach(u=>{
+users.forEach(user=>{
 
-div.innerHTML+=`
-<div class="user">
-${u.username} (${u.role})
-</div>
+table.innerHTML+=`
+
+<tr>
+
+<td>${user.username}</td>
+
+<td>
+<select onchange="updateUser('${user.username}', this.value, null)">
+<option value="player" ${user.role=="player"?"selected":""}>player</option>
+<option value="editor" ${user.role=="editor"?"selected":""}>editor</option>
+<option value="admin" ${user.role=="admin"?"selected":""}>admin</option>
+</select>
+</td>
+
+<td>
+<input type="number" value="${user.score}"
+onchange="updateUser('${user.username}', null, this.value)">
+</td>
+
+<td>
+<button onclick="deleteUser('${user.username}')">Löschen</button>
+</td>
+
+</tr>
+
 `;
 
 });
 
 }
 
-function openEditor(){
 
-window.open("board-editor.html");
+// USER ERSTELLEN
+async function createUser(){
 
-}
+await fetch("/api/users/create",{
 
-function openQuiz(){
+method:"POST",
+headers:{"Content-Type":"application/json"},
 
-window.open("quiz.html");
+body:JSON.stringify({
 
-}
+username:document.getElementById("username").value,
+
+password:document.getElementById("password").value,
+
+role:document.getElementById("role").value
+
+})
+
+});
 
 loadUsers();
+
+}
+
+
+// USER UPDATE
+async function updateUser(username, role, score){
+
+await fetch("/api/users/update",{
+
+method:"POST",
+
+headers:{"Content-Type":"application/json"},
+
+body:JSON.stringify({
+
+username,
+role,
+score
+
+})
+
+});
+
+}
+
+
+// USER DELETE
+async function deleteUser(username){
+
+await fetch("/api/users/delete",{
+
+method:"POST",
+
+headers:{"Content-Type":"application/json"},
+
+body:JSON.stringify({username})
+
+});
+
+loadUsers();
+
+}
+
+
+
+// BOARDS LADEN
+async function loadBoards(){
+
+const res = await fetch("/api/boards");
+
+const boards = await res.json();
+
+const select = document.getElementById("boardSelect");
+
+select.innerHTML="";
+
+Object.keys(boards).forEach(name=>{
+
+select.innerHTML+=`<option value="${name}">${name}</option>`;
+
+});
+
+}
+
+
+// BOARD AKTIVIEREN
+async function selectBoard(){
+
+await fetch("/api/boards/select",{
+
+method:"POST",
+
+headers:{"Content-Type":"application/json"},
+
+body:JSON.stringify({
+
+name:document.getElementById("boardSelect").value
+
+})
+
+});
+
+alert("Board aktiviert");
+
+}
+
+
+// EDITOR
+function openEditor(){
+
+window.open("/board-editor.html","_blank");
+
+}
+
+
+// QUIZ START
+function startQuiz(){
+
+window.open("/quiz.html","_blank");
+
+}
+
+
+// LIVE UPDATE
+socket.on("usersUpdated", loadUsers);
+
+
+// INIT
+loadUsers();
+loadBoards();
 
 </script>
 

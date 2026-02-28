@@ -60,9 +60,8 @@ function renderBoard(board){
 socket.on("questionSelected", q=>{
     currentQuestion = q;
     document.getElementById("questionText").innerText = q.question;
-    const overlay = document.getElementById("questionOverlay");
-    overlay.classList.remove("hidden");
-    document.getElementById("buzzBtn").disabled = true; // Erst freigeben vom Admin
+    document.getElementById("questionOverlay").classList.remove("hidden");
+    document.getElementById("buzzBtn").disabled = true;
 });
 
 // Admin gibt Buzzer frei
@@ -70,7 +69,7 @@ socket.on("buzzEnabled", () => {
     document.getElementById("buzzBtn").disabled = false;
 });
 
-// Timer update
+// Timer Update
 socket.on("timerUpdate", t => {
     document.getElementById("timerDisplay").innerText = "Timer: " + t;
 });
@@ -78,9 +77,9 @@ socket.on("timerUpdate", t => {
 // Timer Ende
 socket.on("timerEnded", () => alert("Zeit abgelaufen!"));
 
-// Buzz Button
+// Buzz
 document.getElementById("buzzBtn").addEventListener("click", ()=>{
-    socket.emit("buzz", "Spieler_" + Math.floor(Math.random()*1000)); // Beispiel Spielername
+    socket.emit("buzz", prompt("Spielername eingeben")); // Jeder Spieler gibt Namen ein
     document.getElementById("buzzBtn").disabled = true;
 });
 

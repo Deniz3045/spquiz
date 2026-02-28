@@ -8,23 +8,16 @@
   },
   "author": "Deniz",
   "license": "ISC",
-  "dependencies": {
-
-    "axios": "^1.6.8",
-
-    "bcrypt": "^5.1.0",
-
-    "body-parser": "^1.20.2",
-
-    "dotenv": "^16.4.5",
-
-    "express": "^4.19.2",
-
-    "express-session": "^1.17.3",
-
-    "socket.io": "^4.7.5",
-
-    "uuid": "^9.0.1"
-
-  }
+"dependencies": {
+  "axios": "^1.6.8",
+  "bcrypt": "^5.1.0",
+  "body-parser": "^1.20.2",
+  "dotenv": "^16.4.5",
+  "express": "^4.19.2",
+  "express-session": "^1.17.3",
+  "socket.io": "^4.7.5",
+  "uuid": "^9.0.1",
+  "@octokit/rest": "^20.0.0"
 }
+}
+

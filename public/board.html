@@ -1,92 +1,43 @@
 <!DOCTYPE html>
-<html lang="de">
+<html>
 <head>
 <meta charset="UTF-8">
-<title>Jeopardy Board - Spieler</title>
-<link rel="stylesheet" href="board.css">
+<title>Spieler Board</title>
+<link rel="stylesheet" href="css/board.css">
 </head>
 <body>
-<div class="container">
-    <header>
-        <h1>Jeopardy Board</h1>
-        <div id="timerDisplay">Timer: 0</div>
-    </header>
 
-    <section class="board" id="board"></section>
+<h1>Quiz</h1>
 
-    <!-- Frage Overlay -->
-    <div id="questionOverlay" class="overlay hidden">
-        <div class="overlayContent">
-            <div id="questionText"></div>
-            <button id="buzzBtn" disabled>Buzzer!</button>
-            <button id="closeBtn">Schließen</button>
-        </div>
-    </div>
-</div>
+<div id="question"></div>
+
+<button id="buzzBtn" onclick="buzz()" disabled>BUZZ</button>
 
 <script src="/socket.io/socket.io.js"></script>
+
 <script>
-const socket = io();
-let currentQuestion = null;
 
-// Board laden
-socket.emit("getBoard");
-socket.on("boardData", board => renderBoard(board));
+const socket=io();
 
-// Board rendern
-function renderBoard(board){
-    const boardEl = document.getElementById("board");
-    boardEl.innerHTML = "";
-    board.categories.forEach(cat=>{
-        const col = document.createElement("div");
-        col.className="column";
-        const catTitle = document.createElement("div");
-        catTitle.className="category";
-        catTitle.innerText=cat.name;
-        col.appendChild(catTitle);
+socket.on("showQuestion",(q)=>{
 
-        cat.questions.forEach(q=>{
-            const btn = document.createElement("button");
-            btn.className="questionBtn";
-            btn.innerText=q.value;
-            btn.disabled=true; // Spieler kann Fragen nicht auswählen
-            col.appendChild(btn);
-        });
-        boardEl.appendChild(col);
-    });
+document.getElementById("question").innerText=q.question;
+
+});
+
+socket.on("enableBuzz",()=>{
+
+document.getElementById("buzzBtn").disabled=false;
+
+});
+
+function buzz(){
+
+socket.emit("buzz");
+
 }
 
-// Frage vom Admin
-socket.on("questionSelected", q=>{
-    currentQuestion = q;
-    document.getElementById("questionText").innerText = q.question;
-    document.getElementById("questionOverlay").classList.remove("hidden");
-    document.getElementById("buzzBtn").disabled = true;
-});
-
-// Admin gibt Buzzer frei
-socket.on("buzzEnabled", () => {
-    document.getElementById("buzzBtn").disabled = false;
-});
-
-// Timer Update
-socket.on("timerUpdate", t => {
-    document.getElementById("timerDisplay").innerText = "Timer: " + t;
-});
-
-// Timer Ende
-socket.on("timerEnded", () => alert("Zeit abgelaufen!"));
-
-// Buzz
-document.getElementById("buzzBtn").addEventListener("click", ()=>{
-    socket.emit("buzz", prompt("Spielername eingeben")); // Jeder Spieler gibt Namen ein
-    document.getElementById("buzzBtn").disabled = true;
-});
-
-// Overlay schließen
-document.getElementById("closeBtn").addEventListener("click", ()=>{
-    document.getElementById("questionOverlay").classList.add("hidden");
-});
 </script>
+
 </body>
 </html>

@@ -1,88 +1,93 @@
 <!DOCTYPE html>
-<html lang="de">
+<html>
 <head>
 <meta charset="UTF-8">
-<title>Jeopardy Quiz Master</title>
-<link rel="stylesheet" href="quiz.css">
+<title>Quiz Master</title>
+<link rel="stylesheet" href="css/quiz.css">
 </head>
 <body>
-<div class="container">
-    <header>
-        <h1>Jeopardy Quiz Master</h1>
-        <div id="currentPlayer">Aktiver Spieler: -</div>
-        <div id="timerDisplay">Timer: 0</div>
-    </header>
 
-    <section class="board" id="board"></section>
+<h1>Quiz Master</h1>
 
-    <section class="controls" id="controls">
-        <button id="startTimerBtn">Timer starten</button>
-        <button id="resetTimerBtn">Timer zurücksetzen</button>
-        <button onclick="window.open('/board-editor.html','_blank','width=1000,height=700')">Board Editor öffnen</button>
-    </section>
+<div id="board"></div>
+
+<div id="questionBox" class="hidden">
+
+<h2 id="questionText"></h2>
+
+<button onclick="showAnswer()">Antwort anzeigen</button>
+
+<div id="answerText"></div>
+
+<button onclick="enableBuzz()">Buzz freigeben</button>
+
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
+
 <script>
-const socket = io();
-let currentQuestion = null;
 
-// Board laden
-socket.emit("getBoard");
-socket.on("boardData", board => renderBoard(board));
+const socket=io();
 
-// Board rendern
-function renderBoard(board) {
-    const boardEl = document.getElementById("board");
-    boardEl.innerHTML = "";
-    board.categories.forEach((cat, cIndex) => {
-        const col = document.createElement("div");
-        col.className = "column";
-        const catTitle = document.createElement("div");
-        catTitle.className = "category";
-        catTitle.innerText = cat.name;
-        col.appendChild(catTitle);
+let currentAnswer="";
 
-        cat.questions.forEach((q, qIndex) => {
-            const btn = document.createElement("button");
-            btn.className = "questionBtn";
-            btn.innerText = q.value;
-            btn.onclick = () => selectQuestion(cIndex, qIndex);
-            col.appendChild(btn);
-        });
-        boardEl.appendChild(col);
-    });
+async function loadBoard(){
+
+const res=await fetch("/api/board/current");
+const board=await res.json();
+
+const div=document.getElementById("board");
+
+board.categories.forEach(cat=>{
+
+const catDiv=document.createElement("div");
+
+catDiv.innerHTML=`<h3>${cat.name}</h3>`;
+
+cat.questions.forEach(q=>{
+
+const btn=document.createElement("button");
+
+btn.innerText=q.value;
+
+btn.onclick=()=>selectQuestion(q);
+
+catDiv.appendChild(btn);
+
+});
+
+div.appendChild(catDiv);
+
+});
+
 }
 
-// Frage auswählen
-function selectQuestion(cIndex, qIndex) {
-    socket.emit("selectQuestion", { categoryIndex: cIndex, questionIndex: qIndex, admin: true });
+function selectQuestion(q){
+
+document.getElementById("questionText").innerText=q.question;
+currentAnswer=q.answer;
+
+document.getElementById("questionBox").classList.remove("hidden");
+
+socket.emit("showQuestion",q);
+
 }
 
-// Frage vom Server
-socket.on("questionSelected", q => {
-    currentQuestion = q;
-    document.getElementById("timerDisplay").innerText = "Timer: " + q.timer;
-    alert(`Frage: ${q.question}\nAntwort: ${q.answer}`);
-});
+function showAnswer(){
 
-// Timer
-document.getElementById("startTimerBtn").addEventListener("click", () => {
-    if(!currentQuestion) return alert("Bitte zuerst eine Frage auswählen!");
-    socket.emit("startTimer");
-});
-document.getElementById("resetTimerBtn").addEventListener("click", () => {
-    if(currentQuestion) document.getElementById("timerDisplay").innerText = "Timer: " + currentQuestion.timer;
-});
+document.getElementById("answerText").innerText=currentAnswer;
 
-// Timer Updates
-socket.on("timerUpdate", t => { document.getElementById("timerDisplay").innerText = "Timer: " + t; });
-socket.on("timerEnded", () => alert("Zeit abgelaufen!"));
+}
 
-// Buzz Updates
-socket.on("buzzUpdate", player => {
-    document.getElementById("currentPlayer").innerText = "Aktiver Spieler: " + player;
-});
+function enableBuzz(){
+
+socket.emit("enableBuzz");
+
+}
+
+loadBoard();
+
 </script>
+
 </body>
 </html>

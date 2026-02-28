@@ -1,43 +1,49 @@
 <!DOCTYPE html>
-<html>
+<html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Spieler Board</title>
-<link rel="stylesheet" href="css/board.css">
+<title>Jeopardy – Spieler</title>
+<link rel="stylesheet" href="player.css">
 </head>
 <body>
 
-<h1>Quiz</h1>
+<div class="topbar">
+  <div class="player-info">
+    Spieler: <span id="playerName">–</span>
+  </div>
 
-<div id="question"></div>
+  <div class="score-info">
+    Punkte: <span id="playerScore">0</span>
+  </div>
+</div>
 
-<button id="buzzBtn" onclick="buzz()" disabled>BUZZ</button>
+<div class="board-container">
+  <div id="waitingScreen" class="waiting">
+    Warten auf Quiz Start...
+  </div>
+</div>
+
+<div id="questionOverlay" class="overlay hidden">
+  <div class="question-box">
+
+    <div class="question-header">
+      <span id="questionCategory"></span>
+      <span id="questionValue"></span>
+    </div>
+
+    <div class="question-text" id="questionText"></div>
+
+    <button id="buzzBtn" class="buzz-button">
+      BUZZ
+    </button>
+
+    <div id="buzzStatus" class="buzz-status"></div>
+
+  </div>
+</div>
 
 <script src="/socket.io/socket.io.js"></script>
-
-<script>
-
-const socket=io();
-
-socket.on("showQuestion",(q)=>{
-
-document.getElementById("question").innerText=q.question;
-
-});
-
-socket.on("enableBuzz",()=>{
-
-document.getElementById("buzzBtn").disabled=false;
-
-});
-
-function buzz(){
-
-socket.emit("buzz");
-
-}
-
-</script>
+<script src="player.js"></script>
 
 </body>
 </html>

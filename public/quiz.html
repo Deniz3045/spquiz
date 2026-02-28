@@ -1,27 +1,146 @@
 <!DOCTYPE html>
-<html>
+<html lang="de">
 <head>
 <meta charset="UTF-8">
 <title>Quiz Master</title>
-<link rel="stylesheet" href="css/quiz.css">
+
+<style>
+
+body{
+background:#0b0f1a;
+color:white;
+font-family:Arial;
+text-align:center;
+}
+
+h1{
+margin-bottom:10px;
+}
+
+.board{
+display:grid;
+grid-template-columns:repeat(5,1fr);
+gap:5px;
+max-width:900px;
+margin:auto;
+}
+
+.category{
+background:#111827;
+padding:10px;
+font-weight:bold;
+}
+
+.cell{
+background:#1e3a8a;
+padding:20px;
+cursor:pointer;
+font-size:22px;
+}
+
+.cell:hover{
+background:#2563eb;
+}
+
+.used{
+background:#111;
+color:#444;
+cursor:default;
+}
+
+.questionModal{
+
+position:fixed;
+top:50%;
+left:50%;
+transform:translate(-50%,-50%);
+
+background:#111827;
+padding:30px;
+
+display:none;
+width:500px;
+
+}
+
+.answer{
+color:#22c55e;
+margin-top:15px;
+font-size:18px;
+}
+
+.timer{
+font-size:40px;
+margin:10px;
+}
+
+button{
+
+padding:10px;
+margin:5px;
+border:none;
+border-radius:5px;
+cursor:pointer;
+
+}
+
+.start{
+background:#2563eb;
+color:white;
+}
+
+.buzz{
+background:#eab308;
+}
+
+.correct{
+background:#22c55e;
+}
+
+.wrong{
+background:#ef4444;
+}
+
+</style>
+
 </head>
 <body>
 
+
 <h1>Quiz Master</h1>
 
-<div id="board"></div>
+<div id="board" class="board"></div>
 
-<div id="questionBox" class="hidden">
+
+<div id="questionModal" class="questionModal">
 
 <h2 id="questionText"></h2>
 
-<button onclick="showAnswer()">Antwort anzeigen</button>
+<div class="answer">
+Antwort: <span id="answerText"></span>
+</div>
 
-<div id="answerText"></div>
+<div class="timer" id="timer">30</div>
 
-<button onclick="enableBuzz()">Buzz freigeben</button>
+<div>
+<button class="start" onclick="startTimer()">Timer starten</button>
+
+<button class="buzz" onclick="enableBuzz()">Buzz freigeben</button>
+</div>
+
+<div id="buzzWinner"></div>
+
+<div>
+
+<button class="correct" onclick="answer(true)">Richtig</button>
+<button class="wrong" onclick="answer(false)">Falsch</button>
 
 </div>
+
+<button onclick="closeQuestion()">Schließen</button>
+
+</div>
+
 
 <script src="/socket.io/socket.io.js"></script>
 
@@ -29,65 +148,161 @@
 
 const socket=io();
 
-let currentAnswer="";
+let board;
+let currentQuestion;
+let activePlayer=null;
+let timerInterval;
 
+
+// LOAD BOARD
 async function loadBoard(){
 
 const res=await fetch("/api/board/current");
-const board=await res.json();
 
-const div=document.getElementById("board");
+board=await res.json();
 
-board.categories.forEach(cat=>{
-
-const catDiv=document.createElement("div");
-
-catDiv.innerHTML=`<h3>${cat.name}</h3>`;
-
-cat.questions.forEach(q=>{
-
-const btn=document.createElement("button");
-
-btn.innerText=q.value;
-
-btn.onclick=()=>selectQuestion(q);
-
-catDiv.appendChild(btn);
-
-});
-
-div.appendChild(catDiv);
-
-});
+render();
 
 }
 
-function selectQuestion(q){
+
+// RENDER BOARD
+function render(){
+
+const div=document.getElementById("board");
+
+div.innerHTML="";
+
+
+// Kategorien
+board.categories.forEach(cat=>{
+
+const el=document.createElement("div");
+
+el.className="category";
+
+el.innerHTML=cat.name;
+
+div.appendChild(el);
+
+});
+
+
+// Fragen
+for(let r=0;r<5;r++){
+
+for(let c=0;c<5;c++){
+
+const q=board.categories[c].questions[r];
+
+const el=document.createElement("div");
+
+el.className="cell";
+
+el.innerHTML=q.value*board.multiplier;
+
+el.onclick=()=>openQuestion(q,el);
+
+div.appendChild(el);
+
+}
+
+}
+
+}
+
+
+// OPEN QUESTION
+function openQuestion(q,el){
+
+currentQuestion=q;
+
+el.classList.add("used");
 
 document.getElementById("questionText").innerText=q.question;
-currentAnswer=q.answer;
 
-document.getElementById("questionBox").classList.remove("hidden");
+document.getElementById("answerText").innerText=q.answer;
+
+document.getElementById("timer").innerText=q.timer;
+
+document.getElementById("questionModal").style.display="block";
 
 socket.emit("showQuestion",q);
 
 }
 
-function showAnswer(){
 
-document.getElementById("answerText").innerText=currentAnswer;
+// CLOSE
+function closeQuestion(){
+
+document.getElementById("questionModal").style.display="none";
 
 }
 
+
+// TIMER
+function startTimer(){
+
+let time=currentQuestion.timer;
+
+document.getElementById("timer").innerText=time;
+
+timerInterval=setInterval(()=>{
+
+time--;
+
+document.getElementById("timer").innerText=time;
+
+if(time<=0){
+
+clearInterval(timerInterval);
+
+}
+
+},1000);
+
+}
+
+
+// BUZZ
 function enableBuzz(){
 
 socket.emit("enableBuzz");
 
 }
 
+
+// BUZZ WINNER
+socket.on("buzzWinner",(username)=>{
+
+activePlayer=username;
+
+document.getElementById("buzzWinner").innerText=
+"Buzz: "+username;
+
+});
+
+
+// ANSWER RESULT
+function answer(correct){
+
+if(!activePlayer)return;
+
+socket.emit("answerResult",{
+
+username:activePlayer,
+correct
+
+});
+
+}
+
+
+// INIT
 loadBoard();
 
 </script>
+
 
 </body>
 </html>

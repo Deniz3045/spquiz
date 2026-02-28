@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="de">
 <head>
 <meta charset="UTF-8">
 <title>Board Editor</title>
@@ -9,33 +9,175 @@
 
 <h1>Board Editor</h1>
 
-<input id="boardName" placeholder="Board Name">
 
-<button onclick="createBoard()">Erstellen</button>
+<div>
 
-<div id="categories"></div>
+Board Name:
+
+<input id="boardName">
+
+Multiplikator:
+
+<input id="multiplier" type="number" value="1">
+
+<button onclick="createBoard()">Neues Board</button>
 
 <button onclick="saveBoard()">Speichern</button>
 
+</div>
+
+
+<hr>
+
+
+<div id="categories"></div>
+
+
+<button onclick="addCategory()">Kategorie hinzufügen</button>
+
+
 <script>
 
-let board={categories:[],multiplier:1};
+let board = {
 
+name:"",
+
+multiplier:1,
+
+categories:[]
+
+};
+
+
+// BOARD ERSTELLEN
 function createBoard(){
 
 board.name=document.getElementById("boardName").value;
 
+board.multiplier=Number(document.getElementById("multiplier").value);
+
+board.categories=[];
+
+render();
+
 }
 
-function saveBoard(){
 
-fetch("/api/boards/save",{
+// CATEGORY HINZUFÜGEN
+function addCategory(){
+
+board.categories.push({
+
+name:"Neue Kategorie",
+
+questions:[]
+
+});
+
+render();
+
+}
+
+
+// QUESTION HINZUFÜGEN
+function addQuestion(catIndex){
+
+board.categories[catIndex].questions.push({
+
+question:"Neue Frage",
+
+answer:"Antwort",
+
+value:100,
+
+timer:30
+
+});
+
+render();
+
+}
+
+
+// RENDER
+function render(){
+
+const div=document.getElementById("categories");
+
+div.innerHTML="";
+
+board.categories.forEach((cat,ci)=>{
+
+let html=`
+
+<h2>
+
+<input value="${cat.name}"
+onchange="board.categories[${ci}].name=this.value">
+
+<button onclick="addQuestion(${ci})">Frage hinzufügen</button>
+
+</h2>
+
+`;
+
+cat.questions.forEach((q,qi)=>{
+
+html+=`
+
+<div class="question">
+
+Frage:
+
+<input value="${q.question}"
+onchange="board.categories[${ci}].questions[${qi}].question=this.value">
+
+Antwort:
+
+<input value="${q.answer}"
+onchange="board.categories[${ci}].questions[${qi}].answer=this.value">
+
+Wert:
+
+<input type="number" value="${q.value}"
+onchange="board.categories[${ci}].questions[${qi}].value=Number(this.value)">
+
+Timer:
+
+<input type="number" value="${q.timer}"
+onchange="board.categories[${ci}].questions[${qi}].timer=Number(this.value)">
+
+</div>
+
+`;
+
+});
+
+div.innerHTML+=html;
+
+});
+
+}
+
+
+// SPEICHERN
+async function saveBoard(){
+
+board.name=document.getElementById("boardName").value;
+
+board.multiplier=Number(document.getElementById("multiplier").value);
+
+await fetch("/api/boards/save",{
 
 method:"POST",
+
 headers:{"Content-Type":"application/json"},
+
 body:JSON.stringify(board)
 
 });
+
+alert("Board gespeichert");
 
 }
 

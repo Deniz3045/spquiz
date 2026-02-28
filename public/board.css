@@ -4,11 +4,15 @@ header { display:flex; justify-content:space-between; align-items:center; margin
 .board { display:flex; justify-content:space-between; }
 .column { display:flex; flex-direction:column; }
 .category { background:#222; padding:10px; text-align:center; border-radius:5px; margin-bottom:5px; font-weight:bold; }
-.questionBtn { background:#00c6ff; color:white; border:none; padding:10px; margin:3px 0; border-radius:5px; cursor:default; transition:0.2s; }
+.questionBtn { background:#00c6ff; color:white; border:none; padding:10px; margin:3px 0; border-radius:5px; cursor:pointer; transition:0.2s; }
 .questionBtn:hover { background:#0088cc; }
+.controls { margin-top:20px; display:flex; gap:10px; }
+button { padding:10px 15px; border:none; border-radius:5px; cursor:pointer; background:#ff8000; color:white; transition:0.2s; }
+button:hover { background:#cc6600; }
 
 .overlay {
-    position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); display:flex; justify-content:center; align-items:center; z-index:1000;
+    position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85);
+    display:flex; justify-content:center; align-items:center; z-index:1000;
 }
 .overlayContent { background:#222; padding:30px; border-radius:10px; text-align:center; width:50%; }
 .hidden { display:none; }

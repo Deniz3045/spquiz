@@ -4,11 +4,5 @@
     "password": "admin123",
     "role": "admin",
     "score": 0
-  },
-  {
-    "username": "player1",
-    "password": "player123",
-    "role": "player",
-    "score": 0
   }
 ]

@@ -3,92 +3,186 @@
 <head>
 <meta charset="UTF-8">
 <title>🔔 SP-QUIZ Buzzer</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800;900&display=swap" rel="stylesheet">
 <style>
     :root {
-        --bg: #0b0c10; --card-bg: rgba(18, 20, 43, 0.7);
+        --bg: #08090d; --card-bg: rgba(18, 20, 43, 0.68);
         --text: #e0e6f0; --active: #00ffd0; --passive: #ff33ff;
         --accent: #7f00ff; --gold: #ffd700; --danger: #ff3c3c; --neon: #0ff;
     }
-    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
     body {
         margin: 0; font-family: 'Poppins', sans-serif;
         background-color: var(--bg); color: var(--text);
-        min-height: 100vh; display: flex; flex-direction: column;
-        align-items: center; justify-content: center; overflow: hidden;
-        position: relative; padding: 20px;
+        height: 100dvh; display: flex; flex-direction: column;
+        align-items: center; position: relative;
+        padding: 8px 10px calc(env(safe-area-inset-bottom, 0px) + 8px);
+        gap: 4px;
     }
-    .bg-orbs { position: absolute; inset: 0; z-index: -1; overflow: hidden; }
-    .orb { position: absolute; border-radius: 50%; filter: blur(60px); opacity: 0.4; animation: float 20s infinite alternate ease-in-out; }
-    .orb:nth-child(1) { width: 300px; height: 300px; background: var(--accent); top: -80px; left: -80px; }
-    .orb:nth-child(2) { width: 250px; height: 250px; background: var(--active); bottom: -50px; right: -50px; animation-delay: -5s; }
-    @keyframes float { 0% { transform: translate(0,0) scale(1); } 100% { transform: translate(60px, 40px) scale(1.2); } }
+    .bg-orbs { position: fixed; inset: 0; z-index: -1; overflow: hidden; }
+    .orb { position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.3; animation: float 22s infinite alternate ease-in-out; }
+    .orb:nth-child(1) { width: 260px; height: 260px; background: var(--accent); top: -80px; left: -80px; }
+    .orb:nth-child(2) { width: 220px; height: 220px; background: var(--active); bottom: -50px; right: -50px; animation-delay: -6s; }
+    .orb:nth-child(3) { width: 180px; height: 180px; background: var(--passive); top: 45%; left: 60%; animation-delay: -12s; }
+    @keyframes float { 0% { transform: translate(0,0) scale(1); } 100% { transform: translate(40px, 25px) scale(1.15); } }
 
-    header { font-size: 26px; font-weight: 900; letter-spacing: 2px; margin-bottom: 10px;
-        background: linear-gradient(90deg, #00ffd0, #7f00ff, #ff33ff);
-        -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-align: center; }
+    @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes popScale { 0% { transform: scale(0.85); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+    @keyframes shake { 10%,90% { transform: translateX(-2px); } 20%,80% { transform: translateX(3px); } 30%,50%,70% { transform: translateX(-5px); } 40%,60% { transform: translateX(5px); } }
+    @keyframes scorePulseUp { 0% { transform: scale(1); } 40% { transform: scale(1.3); color: #fff; text-shadow: 0 0 12px var(--active); } 100% { transform: scale(1); } }
+    @keyframes scorePulseDown { 0% { transform: scale(1); } 40% { transform: scale(1.22); color: var(--danger); text-shadow: 0 0 12px var(--danger); } 100% { transform: scale(1); } }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
 
-    #conn-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; background: var(--danger); margin-left: 6px; vertical-align: middle; }
+    header {
+        flex: 0 0 auto; font-size: clamp(17px, 4.5dvh, 24px); font-weight: 900; letter-spacing: 2px; text-align: center; margin: 0;
+        background: linear-gradient(90deg, #00ffd0, #7f00ff, #ff33ff, #00ffd0);
+        background-size: 300% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        animation: gradientShift 6s linear infinite;
+    }
+    @keyframes gradientShift { to { background-position: 300% center; } }
+
+    #conn-label { flex: 0 0 auto; font-size: 10px; color: #888; display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+    #conn-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; background: var(--danger); margin-left: 4px; vertical-align: middle; transition: 0.3s; }
     #conn-dot.online { background: var(--active); box-shadow: 0 0 8px var(--active); }
-    #conn-label { font-size: 12px; color: #888; margin-bottom: 25px; }
+    #changeNameTop { background: none; border: none; color: #888; font-size: 10px; cursor: pointer; text-decoration: underline; font-family: 'Poppins', sans-serif; padding: 0; }
 
     .card { background: var(--card-bg); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px;
-        padding: 30px; width: 100%; max-width: 380px; text-align: center; backdrop-filter: blur(10px);
-        box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        padding: clamp(14px, 4vw, 24px); width: 100%; max-width: min(94vw, 440px); text-align: center; backdrop-filter: blur(12px);
+        box-shadow: 0 12px 34px rgba(0,0,0,0.5); animation: popScale 0.4s cubic-bezier(0.175,0.885,0.32,1.275);
+        display: flex; flex-direction: column; min-height: 0; max-height: 100%; margin: auto; }
 
-    input {
-        width: 100%; padding: 14px; font-size: 18px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.2);
-        background: rgba(255,255,255,0.05); color: white; text-align: center; margin: 15px 0; font-family: 'Poppins', sans-serif;
+    /* --- ROSTER / NAME PICKER --- */
+    #roster-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; overflow-y: auto; min-height: 0; }
+    .roster-btn {
+        width: 100%; padding: 13px; font-size: 16px; font-weight: 700; border-radius: 14px; flex: 0 0 auto;
+        border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.05); color: white;
+        cursor: pointer; font-family: 'Poppins', sans-serif; transition: 0.2s;
     }
-    input:focus { outline: none; border-color: var(--active); }
+    .roster-btn:active { transform: scale(0.97); background: var(--accent); border-color: var(--neon); }
+    #roster-empty { font-size: 14px; color: #999; margin-top: 16px; animation: pulse 1.5s infinite; }
 
-    button.primary {
-        width: 100%; padding: 16px; font-size: 18px; font-weight: 800; border-radius: 12px; border: none;
-        background: var(--accent); color: white; cursor: pointer; font-family: 'Poppins', sans-serif;
+    #main-screen { display: none; width: 100%; max-width: 640px; flex: 1; min-height: 0; flex-direction: column; gap: 6px; }
+
+    /* --- SCOREBOARD --- */
+    #scoreboard { flex: 0 0 auto; display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 4px; scrollbar-width: none; }
+    #scoreboard::-webkit-scrollbar { display: none; }
+    .score-chip { flex: 0 0 auto; background: var(--card-bg); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px;
+        padding: 5px 11px; text-align: center; min-width: 64px; transition: 0.3s; }
+    .score-chip.active { border-color: var(--active); background: rgba(0,255,208,0.14); box-shadow: 0 0 12px rgba(0,255,208,0.35); transform: translateY(-1px); }
+    .score-chip.me { border-color: var(--passive); }
+    .sc-name { display: block; font-size: 9px; text-transform: uppercase; color: #aaa; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80px; }
+    .score-chip.active .sc-name { color: white; }
+    .sc-score { display: block; font-size: 15px; font-weight: 900; color: var(--active); margin-top: 1px; }
+    .sc-score.pulse-up { animation: scorePulseUp 0.6s ease; }
+    .sc-score.pulse-down { animation: scorePulseDown 0.6s ease; }
+    .sc-jokers { display: block; font-size: 9px; margin-top: 2px; letter-spacing: 2px; }
+    .sc-jokers .used { opacity: 0.22; filter: grayscale(1); text-decoration: line-through; }
+
+    /* --- MAIN CONTENT AREA (Board oder Frage) --- */
+    #phase-area { flex: 1; min-height: 0; display: flex; flex-direction: column; animation: fadeSlideIn 0.3s ease; overflow: hidden; }
+
+    .board-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    .board-label { flex: 0 0 auto; font-size: clamp(11px, 2.2dvh, 14px); font-weight: 700; letter-spacing: 1px; color: #999; margin-bottom: 4px; text-align: center; }
+    .mini-board { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: auto repeat(5, 1fr); gap: clamp(3px, 0.7dvh, 7px); }
+    .mini-cat { background: rgba(255,255,255,0.06); border-radius: 7px; font-size: clamp(7px, min(2.2vw, 1.6dvh), 12px); font-weight: 800; text-transform: uppercase;
+        padding: 2px; text-align: center; color: white; line-height: 1.1; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .mini-cell { background: var(--card-bg); border: 1px solid rgba(255,255,255,0.05); border-radius: 7px; text-align: center;
+        font-size: clamp(12px, min(4.5vw, 3.6dvh), 24px); font-weight: 800; color: var(--neon); transition: 0.3s;
+        display: flex; align-items: center; justify-content: center; }
+    .mini-cell.used { opacity: 0.15; filter: grayscale(1); }
+    .mini-cell.bonus { color: var(--gold); text-shadow: 0 0 8px var(--gold); }
+    .cell-enter { animation: popScale 0.4s ease backwards; }
+
+    .status-line { flex: 0 0 auto; font-size: clamp(12px, 2.4dvh, 15px); font-weight: 700; color: var(--active); text-align: center; margin: 6px 0 0; }
+
+    /* --- QUESTION CARD --- */
+    .qcard { flex: 1; min-height: 0; background: var(--card-bg); border: 1px solid rgba(255,255,255,0.1); border-radius: 18px;
+        padding: clamp(10px, 2.6dvh, 20px); display: flex; flex-direction: column; gap: 6px; overflow: hidden; animation: popScale 0.35s ease; }
+    .qcard-top { flex: 0 0 auto; display: flex; justify-content: space-between; align-items: center; }
+    .cat-tag { font-size: clamp(9px, 1.8dvh, 11px); font-weight: 800; text-transform: uppercase; background: rgba(127,0,255,0.25); color: #c9a3ff;
+        padding: 3px 9px; border-radius: 20px; }
+    .pts-tag { font-size: clamp(12px, 2.4dvh, 15px); font-weight: 900; color: var(--gold); }
+    .qtext { flex: 0 1 auto; overflow: hidden; font-size: clamp(13px, min(4vw, 2.8dvh), 20px); font-weight: 700; line-height: 1.35; }
+    .q-img-mini { flex: 1 1 auto; min-height: 0; max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 10px; margin: 0 auto; display: block; }
+
+    .timer-wrap { flex: 0 0 auto; width: 100%; height: 8px; background: rgba(255,255,255,0.06); border-radius: 8px; overflow: hidden; margin: 2px 0; }
+    .timer-bar-mini { width: 100%; height: 100%; background: linear-gradient(90deg, var(--active), var(--neon)); transition: width 0.25s linear; }
+    .timer-bar-mini.urgent { background: linear-gradient(90deg, var(--danger), #ff8800); animation: timerUrgentPulse 0.6s infinite alternate; }
+    @keyframes timerUrgentPulse { from { filter: brightness(1); } to { filter: brightness(1.5); } }
+
+    .answer-card { flex: 0 1 auto; overflow: hidden; padding: 10px 12px; background: rgba(0,255,208,0.08); border: 1px solid var(--active); border-radius: 12px; animation: popScale 0.4s ease; }
+    .answer-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--active); font-weight: 700; }
+    .answer-text { font-size: clamp(13px, 2.6dvh, 17px); font-weight: 700; margin-top: 4px; }
+
+    .queue-hint { flex: 0 0 auto; font-size: clamp(11px, 2dvh, 13px); color: #999; margin-top: 6px; font-weight: 600; text-align: center; }
+
+    /* --- FLOATING CORNER BUZZER --- */
+    #buzzFloating {
+        position: fixed; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); right: 12px; z-index: 100;
+        display: flex; flex-direction: column; align-items: center; gap: 5px;
     }
-
-    #status { font-size: 16px; font-weight: 600; min-height: 44px; margin-bottom: 20px; line-height: 1.4; transition: 0.3s; }
+    #buzzStatusLabel {
+        font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;
+        background: rgba(0,0,0,0.6); padding: 4px 10px; border-radius: 20px; white-space: nowrap;
+        border: 1px solid rgba(255,255,255,0.15); backdrop-filter: blur(6px); transition: 0.2s;
+    }
+    .buzz-ring { position: relative; display: flex; align-items: center; justify-content: center; }
+    .buzz-ring::before {
+        content: ""; position: absolute; inset: -9px; border-radius: 50%;
+        border: 2px solid var(--active); opacity: 0; pointer-events: none;
+    }
+    .buzz-ring.ready::before { animation: ringPulse 1.6s infinite; }
+    @keyframes ringPulse { 0% { opacity: 0.7; transform: scale(0.9); } 100% { opacity: 0; transform: scale(1.5); } }
 
     #buzzBtn {
-        width: 220px; height: 220px; border-radius: 50%; border: none; font-size: 60px;
+        width: clamp(58px, 16vw, 80px); height: clamp(58px, 16vw, 80px); border-radius: 50%; border: none; font-size: clamp(22px, 5.5vw, 28px);
         background: radial-gradient(circle at 35% 30%, #1affce, #00b894);
-        box-shadow: 0 0 40px rgba(0,255,208,0.6), inset 0 -10px 20px rgba(0,0,0,0.2);
-        cursor: pointer; transition: transform 0.1s ease, box-shadow 0.3s, background 0.3s;
-        color: #012; font-family: 'Poppins', sans-serif; font-weight: 900;
+        box-shadow: 0 0 20px rgba(0,255,208,0.55), inset 0 -6px 12px rgba(0,0,0,0.2);
+        cursor: pointer; transition: transform 0.1s ease, box-shadow 0.3s, background 0.3s; color: #012; font-weight: 900;
     }
-    #buzzBtn:active:not(:disabled) { transform: scale(0.93); }
+    #buzzBtn:active:not(:disabled) { transform: scale(0.88); }
     #buzzBtn:disabled { cursor: default; }
-    #buzzBtn.waiting { background: radial-gradient(circle at 35% 30%, #444, #222); box-shadow: none; opacity: 0.6; }
-    #buzzBtn.lost { background: radial-gradient(circle at 35% 30%, #ff6666, #b30000); box-shadow: 0 0 30px rgba(255,60,60,0.5); opacity: 0.7; }
-    #buzzBtn.win { background: radial-gradient(circle at 35% 30%, #ffe680, var(--gold)); box-shadow: 0 0 50px rgba(255,215,0,0.8); animation: winPulse 0.8s infinite alternate; }
-    @keyframes winPulse { 0% { transform: scale(1); } 100% { transform: scale(1.06); } }
+    #buzzBtn.waiting { background: radial-gradient(circle at 35% 30%, #3a3a3a, #1a1a1a); box-shadow: none; opacity: 0.5; }
+    #buzzBtn.queued { background: radial-gradient(circle at 35% 30%, #ffd08a, #cc7a00); box-shadow: 0 0 18px rgba(255,165,0,0.5); }
+    #buzzBtn.lost { background: radial-gradient(circle at 35% 30%, #ff6666, #b30000); box-shadow: 0 0 18px rgba(255,60,60,0.5); opacity: 0.8; animation: shake 0.4s ease; }
+    #buzzBtn.win { background: radial-gradient(circle at 35% 30%, #ffe680, var(--gold)); box-shadow: 0 0 32px rgba(255,215,0,0.85); animation: winPulse 0.8s infinite alternate; }
+    @keyframes winPulse { 0% { transform: scale(1); } 100% { transform: scale(1.08); } }
 
-    #changeName { background: none; border: none; color: #888; font-size: 13px; margin-top: 20px; cursor: pointer; text-decoration: underline; font-family: 'Poppins', sans-serif; }
-    #buzz-screen { display: none; }
+    #spaceHint { font-size: 8px; color: #666; text-align: center; }
 </style>
 </head>
 <body>
-<div class="bg-orbs"><div class="orb"></div><div class="orb"></div></div>
+<div class="bg-orbs"><div class="orb"></div><div class="orb"></div><div class="orb"></div></div>
 
-<header>🔔 SP-QUIZ BUZZER</header>
-<div id="conn-label">Verbindung <span id="conn-dot"></span></div>
+<header>🔔 SP-QUIZ</header>
+<div id="conn-label">Verbindung <span id="conn-dot"></span> · <button id="changeNameTop" onclick="changeName()" style="display:none;">Namen ändern</button></div>
 
 <div class="card" id="name-screen">
-    <h2 style="margin-top:0;">Wie heißt du?</h2>
-    <input id="nameInput" placeholder="Dein Name" maxlength="20" autocomplete="off">
-    <button class="primary" onclick="saveName()">Los geht's 🚀</button>
+    <h2 style="margin:0 0 2px;">Wer bist du?</h2>
+    <p style="font-size:12px; color:#999; margin:0;">Wähle deinen Namen aus der Spielerliste</p>
+    <div id="roster-list"></div>
+    <div id="roster-empty" style="display:none;">⏳ Warte, bis der Quizmaster Spieler hinzufügt...</div>
 </div>
 
-<div class="card" id="buzz-screen">
-    <div id="status">Warte...</div>
-    <button id="buzzBtn" onclick="pressBuzz()" disabled>🔔</button>
-    <div><button id="changeName" onclick="changeName()">Namen ändern</button></div>
+<div id="main-screen">
+    <div id="scoreboard"></div>
+    <div id="phase-area"></div>
+</div>
+
+<div id="buzzFloating">
+    <div id="buzzStatusLabel">🔒</div>
+    <div class="buzz-ring" id="buzzRing">
+        <button id="buzzBtn" onclick="pressBuzz()" disabled>🔔</button>
+    </div>
+    <div id="spaceHint">Leertaste</div>
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-import { getDatabase, ref, onValue, runTransaction } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
+import { getDatabase, ref, set, onValue, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyDOqgEZoRRyam3rbsELQjqw40o205_Tnmg",
@@ -103,85 +197,321 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const buzzRef = ref(db, "buzz");
-const winnerRef = ref(db, "buzz/winner");
+const gameStateRef = ref(db, "gameState");
 const connRef = ref(db, ".info/connected");
 
 let myName = localStorage.getItem("buzzerName") || "";
-let lastData = {};
+let lastBuzzData = {};
+let lastGameState = {};
+let countdownTimer = null;
+let lastWinnerKey = null;
+let wasRejected = false;
+let lastScores = {};
+let lastBoardIndex = null;
+let prevPhase = null;
+let urgentSecond = null;
+
+function sanitizeKey(name) { return String(name).replace(/[.#$/\[\]]/g, "_"); }
+function escapeHtml(str) {
+    return String(str == null ? "" : str).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+}
+
+// --- SOUND ENGINE ---
+const AudioCtor = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+function ensureAudio() {
+    if (!audioCtx) audioCtx = new AudioCtor();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+}
+function playSound(type) {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    const now = audioCtx.currentTime;
+    if (type === "press") {
+        osc.type = "square"; osc.frequency.setValueAtTime(700, now); osc.frequency.exponentialRampToValueAtTime(250, now + 0.15);
+        gain.gain.setValueAtTime(0.22, now); gain.gain.linearRampToValueAtTime(0, now + 0.18);
+        osc.start(now); osc.stop(now + 0.18);
+    } else if (type === "win") {
+        osc.type = "triangle"; osc.frequency.setValueAtTime(500, now); osc.frequency.exponentialRampToValueAtTime(1000, now + 0.3);
+        gain.gain.setValueAtTime(0.28, now); gain.gain.linearRampToValueAtTime(0, now + 0.5);
+        osc.start(now); osc.stop(now + 0.5);
+    } else if (type === "lost") {
+        osc.type = "sawtooth"; osc.frequency.setValueAtTime(180, now); osc.frequency.exponentialRampToValueAtTime(90, now + 0.3);
+        gain.gain.setValueAtTime(0.2, now); gain.gain.linearRampToValueAtTime(0, now + 0.35);
+        osc.start(now); osc.stop(now + 0.35);
+    } else if (type === "open") {
+        osc.type = "sine"; osc.frequency.setValueAtTime(500, now); osc.frequency.linearRampToValueAtTime(1000, now + 0.12);
+        gain.gain.setValueAtTime(0.14, now); gain.gain.linearRampToValueAtTime(0, now + 0.25);
+        osc.start(now); osc.stop(now + 0.25);
+    } else if (type === "reveal") {
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(600, now); osc.frequency.setValueAtTime(900, now + 0.1); osc.frequency.setValueAtTime(1200, now + 0.2);
+        gain.gain.setValueAtTime(0.2, now); gain.gain.linearRampToValueAtTime(0, now + 0.4);
+        osc.start(now); osc.stop(now + 0.4);
+    } else if (type === "roundopen") {
+        osc.type = "square";
+        osc.frequency.setValueAtTime(300, now); osc.frequency.setValueAtTime(450, now + 0.08); osc.frequency.setValueAtTime(600, now + 0.16);
+        gain.gain.setValueAtTime(0.16, now); gain.gain.linearRampToValueAtTime(0, now + 0.3);
+        osc.start(now); osc.stop(now + 0.3);
+    } else if (type === "tick") {
+        osc.type = "sine"; osc.frequency.setValueAtTime(800, now);
+        gain.gain.setValueAtTime(0.12, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+        osc.start(now); osc.stop(now + 0.1);
+    }
+}
 
 onValue(connRef, (snap) => {
     document.getElementById("conn-dot").classList.toggle("online", snap.val() === true);
 });
 
+// --- NAME / ROSTER ---
+function renderRoster() {
+    const list = document.getElementById("roster-list");
+    const empty = document.getElementById("roster-empty");
+    const players = lastGameState.players || [];
+    if (!players.length) { list.innerHTML = ""; empty.style.display = "block"; return; }
+    empty.style.display = "none";
+    list.innerHTML = players.map((p) => `<button class="roster-btn" onclick="selectName('${p.name.replace(/'/g, "\\'")}')">${escapeHtml(p.name)}</button>`).join("");
+}
+
 function initScreen() {
+    const nameScreen = document.getElementById("name-screen");
+    const mainScreen = document.getElementById("main-screen");
+    const changeBtn = document.getElementById("changeNameTop");
     if (myName) {
-        document.getElementById("name-screen").style.display = "none";
-        document.getElementById("buzz-screen").style.display = "block";
+        nameScreen.style.display = "none";
+        mainScreen.style.display = "flex";
+        changeBtn.style.display = "inline";
     } else {
-        document.getElementById("name-screen").style.display = "block";
-        document.getElementById("buzz-screen").style.display = "none";
+        nameScreen.style.display = "flex";
+        mainScreen.style.display = "none";
+        changeBtn.style.display = "none";
+        renderRoster();
     }
 }
 
-window.saveName = function () {
-    const val = document.getElementById("nameInput").value.trim();
-    if (!val) return;
-    myName = val;
+window.selectName = function (name) {
+    ensureAudio();
+    myName = name;
     localStorage.setItem("buzzerName", myName);
     initScreen();
+    renderScoreboard();
+    renderPhase();
 };
 
 window.changeName = function () {
     localStorage.removeItem("buzzerName");
     myName = "";
-    document.getElementById("nameInput").value = "";
     initScreen();
 };
 
-function renderState(data) {
-    lastData = data;
-    const open = !!data.open;
-    const winner = data.winner || null;
-    const rejected = data.rejected || {};
-    const iAmRejected = !!rejected[myName];
+// --- SCOREBOARD ---
+function renderScoreboard() {
+    const box = document.getElementById("scoreboard");
+    const players = lastGameState.players || [];
+    if (!players.length) { box.innerHTML = ""; return; }
+    box.innerHTML = players.map((p) => {
+        const prev = lastScores[p.name];
+        let pulse = "";
+        if (prev !== undefined && prev !== p.score) pulse = p.score > prev ? "pulse-up" : "pulse-down";
+        lastScores[p.name] = p.score;
+        return `
+        <div class="score-chip ${p.name === lastGameState.activePlayer ? 'active' : ''} ${p.name === myName ? 'me' : ''}">
+            <span class="sc-name">${escapeHtml(p.name)}</span>
+            <span class="sc-score ${pulse}">${p.score}</span>
+            <span class="sc-jokers">
+                <span class="${p.jokerTimeAvailable === false ? 'used' : ''}">⏱️</span>
+                <span class="${p.jokerDoubleAvailable === false ? 'used' : ''}">✖️2</span>
+            </span>
+        </div>`;
+    }).join("");
+}
 
+// --- BOARD ---
+function renderBoardHTML() {
+    const gs = lastGameState;
+    const cats = gs.categories || [];
+    const cells = gs.cells || [];
+    const isNewBoard = gs.boardIndex !== lastBoardIndex;
+    lastBoardIndex = gs.boardIndex;
+
+    let html = `<div class="board-wrap"><div class="board-label">BOARD ${(gs.boardIndex || 0) + 1} / ${gs.boardTotal || 0}</div><div class="mini-board">`;
+    cats.forEach((c, i) => {
+        const style = isNewBoard ? ` style="animation-delay:${(i * 0.05).toFixed(2)}s"` : "";
+        html += `<div class="mini-cat ${isNewBoard ? 'cell-enter' : ''}"${style}>${escapeHtml(c)}</div>`;
+    });
+    let idx = 0;
+    for (let r = 0; r < 5; r++) {
+        for (let c = 0; c < 5; c++) {
+            const cell = (cells[c] && cells[c][r]) ? cells[c][r] : { pts: 0, used: false, bonus: false };
+            const cls = `mini-cell ${cell.used ? 'used' : ''} ${cell.bonus ? 'bonus' : ''} ${isNewBoard ? 'cell-enter' : ''}`;
+            const style = isNewBoard ? ` style="animation-delay:${(idx * 0.018).toFixed(2)}s"` : "";
+            html += `<div class="${cls}"${style}>${cell.bonus && !cell.used ? '★' : cell.pts}</div>`;
+            idx++;
+        }
+    }
+    html += `</div><div class="status-line">🎯 ${escapeHtml(gs.activePlayer || '---')} ist als nächstes dran</div></div>`;
+    return html;
+}
+
+// --- TIMER ---
+function stopCountdown() { if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; } urgentSecond = null; }
+function startCountdown(timer) {
+    stopCountdown();
+    function tick() {
+        const remaining = Math.max(0, (timer.endsAt - Date.now()) / 1000);
+        const pct = timer.duration > 0 ? Math.max(0, Math.min(100, (remaining / timer.duration) * 100)) : 0;
+        const bar = document.getElementById("timerBarMini");
+        if (bar) {
+            bar.style.width = pct + "%";
+            const isUrgent = remaining <= 5 && remaining > 0;
+            bar.classList.toggle("urgent", isUrgent);
+            if (isUrgent) {
+                const sec = Math.ceil(remaining);
+                if (sec !== urgentSecond) { urgentSecond = sec; playSound("tick"); }
+            }
+        }
+    }
+    tick();
+    countdownTimer = setInterval(tick, 200);
+}
+
+// --- BUZZ QUEUE ---
+function computeQueue(data) {
+    const entries = (data && data.entries) || {};
+    const rejected = (data && data.rejected) || {};
+    return Object.keys(entries)
+        .map((k) => ({ key: k, name: entries[k].name, ts: entries[k].ts || Infinity }))
+        .filter((e) => !rejected[e.key])
+        .sort((a, b) => a.ts - b.ts);
+}
+
+function renderBuzzFloating() {
+    const data = lastBuzzData || {};
+    const open = !!data.open;
+    const myKey = sanitizeKey(myName);
+    const rejected = data.rejected || {};
+    const iAmRejected = !!rejected[myKey];
+    const queue = computeQueue(data);
+    const myPos = queue.findIndex((e) => e.key === myKey);
+
+    const label = document.getElementById("buzzStatusLabel");
     const btn = document.getElementById("buzzBtn");
-    const status = document.getElementById("status");
-    btn.classList.remove("win", "lost", "waiting");
+    const ring = document.getElementById("buzzRing");
+    btn.classList.remove("waiting", "lost", "win", "queued");
+    ring.classList.remove("ready");
+
+    if (!data.entries || Object.keys(data.entries).length === 0) { lastWinnerKey = null; wasRejected = false; }
+
+    if (!myName) { label.textContent = "🔒"; btn.disabled = true; btn.classList.add("waiting"); return; }
+
+    if (myName === lastGameState.activePlayer) {
+        label.textContent = "🎯 Du bist dran"; btn.disabled = true; btn.classList.add("waiting");
+        return;
+    }
 
     if (!open) {
-        btn.disabled = true; btn.classList.add("waiting");
-        status.textContent = "⏳ Warte auf die nächste Frage...";
+        label.textContent = "Bereit"; btn.disabled = true; btn.classList.add("waiting");
     } else if (iAmRejected) {
-        btn.disabled = true; btn.classList.add("lost");
-        status.textContent = "❌ Falsch geraten – warte auf die nächste Runde.";
-    } else if (winner === myName) {
-        btn.disabled = true; btn.classList.add("win");
-        status.textContent = "🎉 DU BIST DRAN! Sag die Antwort laut!";
-    } else if (winner) {
-        btn.disabled = true; btn.classList.add("lost");
-        status.textContent = `⚡ ${winner} war schneller!`;
+        label.textContent = "❌ Raus"; btn.disabled = true; btn.classList.add("lost");
+        if (!wasRejected) { wasRejected = true; playSound("lost"); if (navigator.vibrate) navigator.vibrate([30, 40, 30]); }
+    } else if (myPos === 0) {
+        label.textContent = "🎉 DU!"; btn.disabled = true; btn.classList.add("win");
+        if (lastWinnerKey !== myKey) {
+            lastWinnerKey = myKey;
+            playSound("win");
+            confetti({ particleCount: 120, spread: 80, origin: { y: 0.85, x: 0.85 }, colors: ['#ffd700', '#00ffd0', '#7f00ff'] });
+            if (navigator.vibrate) navigator.vibrate([40, 30, 80]);
+        }
+    } else if (myPos > 0) {
+        label.textContent = `Platz ${myPos + 1}`; btn.disabled = true; btn.classList.add("queued");
     } else {
-        btn.disabled = false;
-        status.textContent = "🔔 Bereit! Buzzere, sobald du die Antwort weißt.";
+        label.textContent = "🔔 BUZZERN"; btn.disabled = false; ring.classList.add("ready");
     }
 }
 
-onValue(buzzRef, (snap) => renderState(snap.val() || {}));
-
-window.pressBuzz = async function () {
-    if (!myName || !lastData.open) return;
-    const rejected = lastData.rejected || {};
-    if (rejected[myName]) return;
-    if (navigator.vibrate) navigator.vibrate(60);
-    document.getElementById("buzzBtn").disabled = true;
-    try {
-        await runTransaction(winnerRef, (current) => {
-            if (current === null || current === undefined) return myName;
-            return; // abort, jemand war schon schneller
-        });
-    } catch (e) { /* ignore */ }
+window.pressBuzz = function () {
+    if (!myName) return;
+    ensureAudio();
+    if (myName === lastGameState.activePlayer) return;
+    const data = lastBuzzData || {};
+    if (!data.open) return;
+    const myKey = sanitizeKey(myName);
+    if ((data.entries && data.entries[myKey]) || (data.rejected && data.rejected[myKey])) return;
+    playSound("press");
+    if (navigator.vibrate) navigator.vibrate(50);
+    set(ref(db, `buzz/entries/${myKey}`), { name: myName, ts: serverTimestamp() });
 };
+
+document.addEventListener("keydown", (e) => {
+    if (e.code !== "Space") return;
+    e.preventDefault();
+    const btn = document.getElementById("buzzBtn");
+    if (btn && !btn.disabled) pressBuzz();
+});
+
+// --- PHASE ROUTER ---
+function renderPhase() {
+    const gs = lastGameState;
+    const phase = gs.phase || "board";
+    const area = document.getElementById("phase-area");
+
+    if (phase === "board" || !gs.question) {
+        stopCountdown();
+        area.innerHTML = renderBoardHTML();
+        return;
+    }
+
+    const q = gs.question || {};
+    let html = `<div class="qcard">`;
+    html += `<div class="qcard-top"><span class="cat-tag">${escapeHtml(q.category)}</span><span class="pts-tag">${q.points || 0} Pkt</span></div>`;
+    html += `<div class="qtext">${escapeHtml(q.text)}</div>`;
+    if (q.img) html += `<img src="${q.img}" class="q-img-mini">`;
+
+    if (phase === "timer" && gs.timer) {
+        html += `<div class="timer-wrap"><div id="timerBarMini" class="timer-bar-mini"></div></div>`;
+    }
+    if (phase === "question" || phase === "timer") {
+        html += `<div class="status-line">🎯 ${escapeHtml(gs.activePlayer)} ist dran...</div>`;
+    }
+    if (phase === "passive") {
+        const queue = computeQueue(lastBuzzData);
+        html += `<div class="status-line">🔔 Wer weiß es? Buzzere in der Ecke!</div>`;
+        if (queue.length) html += `<div class="queue-hint">Warteschlange: ${queue.map((e) => escapeHtml(e.name)).join(" → ")}</div>`;
+    }
+    if (phase === "answer" && gs.answer) {
+        html += `<div class="answer-card"><div class="answer-label">Richtige Antwort</div><div class="answer-text">${escapeHtml(gs.answer.text)}</div>`;
+        if (gs.answer.img) html += `<img src="${gs.answer.img}" class="q-img-mini">`;
+        html += `</div>`;
+    }
+    html += `</div>`;
+    area.innerHTML = html;
+
+    if (phase === "timer" && gs.timer) startCountdown(gs.timer); else stopCountdown();
+}
+
+onValue(gameStateRef, (snap) => {
+    lastGameState = snap.val() || {};
+    renderRoster();
+    renderScoreboard();
+    renderPhase();
+
+    const newPhase = lastGameState.phase || "board";
+    if (prevPhase !== null && newPhase !== prevPhase && myName) {
+        if (newPhase === "question") playSound("open");
+        else if (newPhase === "passive") playSound("roundopen");
+        else if (newPhase === "answer") playSound("reveal");
+    }
+    prevPhase = newPhase;
+});
+
+onValue(buzzRef, (snap) => {
+    lastBuzzData = snap.val() || {};
+    renderBuzzFloating();
+    if ((lastGameState.phase || "board") === "passive") renderPhase();
+});
 
 initScreen();
 </script>
